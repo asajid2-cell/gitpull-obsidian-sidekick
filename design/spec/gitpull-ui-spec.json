@@ -1,0 +1,431 @@
+{
+  "app": {
+    "name": "gitpull",
+    "platform": "Android",
+    "purpose": "Manual GitHub vault snapshot refresh utility for Obsidian Mobile, with authenticated repo browsing and a PDF shortcut tab for opening pulled PDFs in external apps.",
+    "principles": [
+      "GitHub is the source of truth.",
+      "The app pulls only; it never commits or pushes.",
+      "Obsidian remains the note reader and editor.",
+      "Local vault output must be a normal Android folder selected by the user.",
+      "A failed pull must leave the previous local snapshot usable."
+    ],
+    "imageReferences": {
+      "colorsTypography": "../images/01-colors-typography.png",
+      "layoutSpacing": "../images/02-layout-spacing.png",
+      "controlsStates": "../images/03-controls-states.png",
+      "cardsLists": "../images/04-cards-lists.png",
+      "userFlow": "../images/05-user-flow.png",
+      "apkLogo": "../images/06-apk-logo.png"
+    }
+  },
+  "designTokens": {
+    "color": {
+      "textPrimary": "#111827",
+      "textSecondary": "#334155",
+      "textMuted": "#64748B",
+      "background": "#F8FAFC",
+      "surface": "#FFFFFF",
+      "surfaceSubtle": "#F1F5F9",
+      "line": "#E2E8F0",
+      "lineStrong": "#CBD5E1",
+      "accent": "#7C3AED",
+      "accentSoft": "#F3E8FF",
+      "success": "#16A34A",
+      "successSoft": "#DCFCE7",
+      "warning": "#D97706",
+      "warningSoft": "#FEF3C7",
+      "danger": "#DC2626",
+      "dangerSoft": "#FEE2E2",
+      "scrim": "#11182799"
+    },
+    "typography": {
+      "fontFamily": "Inter, Roboto, system sans-serif",
+      "display": {
+        "fontSize": 32,
+        "lineHeight": 40,
+        "fontWeight": 700
+      },
+      "screenTitle": {
+        "fontSize": 22,
+        "lineHeight": 28,
+        "fontWeight": 700
+      },
+      "sectionTitle": {
+        "fontSize": 16,
+        "lineHeight": 24,
+        "fontWeight": 650
+      },
+      "body": {
+        "fontSize": 15,
+        "lineHeight": 22,
+        "fontWeight": 400
+      },
+      "bodyStrong": {
+        "fontSize": 15,
+        "lineHeight": 22,
+        "fontWeight": 600
+      },
+      "caption": {
+        "fontSize": 12,
+        "lineHeight": 16,
+        "fontWeight": 500
+      },
+      "button": {
+        "fontSize": 16,
+        "lineHeight": 20,
+        "fontWeight": 700
+      }
+    },
+    "spacing": {
+      "xs": 4,
+      "sm": 8,
+      "md": 12,
+      "lg": 16,
+      "xl": 24,
+      "xxl": 32,
+      "screenPadding": 20,
+      "sectionGap": 24,
+      "rowGap": 12
+    },
+    "radius": {
+      "small": 6,
+      "medium": 8,
+      "large": 12,
+      "pill": 999
+    },
+    "elevation": {
+      "none": "none",
+      "card": "0 1px 2px rgba(15, 23, 42, 0.06)",
+      "modal": "0 16px 40px rgba(15, 23, 42, 0.18)"
+    },
+    "motion": {
+      "fast": 120,
+      "normal": 180,
+      "slow": 280,
+      "easing": "cubic-bezier(0.2, 0, 0, 1)"
+    },
+    "touchTargets": {
+      "minimum": 48,
+      "iconButton": 48,
+      "listRowMinHeight": 64,
+      "primaryButtonHeight": 64,
+      "fieldHeight": 56
+    }
+  },
+  "navigation": {
+    "type": "BottomNavigation",
+    "tabs": [
+      {
+        "id": "pull",
+        "label": "Pull",
+        "icon": "download"
+      },
+      {
+        "id": "pdfs",
+        "label": "PDFs",
+        "icon": "file-text"
+      },
+      {
+        "id": "settings",
+        "label": "Settings",
+        "icon": "settings"
+      }
+    ],
+    "rules": [
+      "Keep bottom navigation visible on all primary screens.",
+      "Use the Pull tab as the launch destination after setup is complete.",
+      "Show setup as a blocking first-run screen until repo and destination folder are configured."
+    ]
+  },
+  "components": {
+    "AppBar": {
+      "height": 64,
+      "paddingHorizontal": 20,
+      "titleStyle": "screenTitle",
+      "background": "surface",
+      "bottomBorder": "line",
+      "slots": ["title", "subtitleOptional", "trailingIconOptional"]
+    },
+    "PrimaryPullButton": {
+      "height": 112,
+      "radius": 12,
+      "background": "textPrimary",
+      "foreground": "surface",
+      "pressedBackground": "#000000",
+      "disabledBackground": "#CBD5E1",
+      "icon": "download",
+      "label": "Pull",
+      "states": {
+        "idle": {
+          "label": "Pull",
+          "helper": "Ready to refresh"
+        },
+        "pulling": {
+          "label": "Pulling...",
+          "helper": "Downloading latest snapshot",
+          "showProgress": true
+        },
+        "success": {
+          "label": "Pull",
+          "helper": "Snapshot ready",
+          "statusColor": "success"
+        },
+        "error": {
+          "label": "Retry Pull",
+          "helper": "Could not refresh vault",
+          "statusColor": "danger"
+        },
+        "disabled": {
+          "label": "Pull",
+          "helper": "Set repo and folder first"
+        }
+      }
+    },
+    "TextField": {
+      "height": 56,
+      "radius": 8,
+      "background": "surface",
+      "border": "line",
+      "focusedBorder": "accent",
+      "labelStyle": "caption",
+      "valueStyle": "body",
+      "errorBorder": "danger",
+      "supportingTextStyle": "caption"
+    },
+    "FolderSelector": {
+      "height": 56,
+      "radius": 8,
+      "background": "surface",
+      "border": "line",
+      "icon": "folder",
+      "buttonLabel": "Choose folder",
+      "description": "Uses Android Storage Access Framework and persisted URI permission."
+    },
+    "RepositoryBrowser": {
+      "radius": 8,
+      "background": "surface",
+      "border": "line",
+      "padding": 16,
+      "title": "GitHub repositories",
+      "body": "Load repos available to your GitHub token, then choose the vault repo.",
+      "loadButton": {
+        "height": 48,
+        "label": "Load",
+        "loadingIndicator": true
+      },
+      "row": {
+        "minHeight": 56,
+        "privateIcon": "lock",
+        "publicIcon": "globe",
+        "primaryText": "owner/repo",
+        "secondaryText": "defaultBranch",
+        "trailingAction": "Use"
+      },
+      "states": {
+        "missingToken": "Save or paste a GitHub token before loading repositories.",
+        "loading": "Progress indicator inside Load button.",
+        "loaded": "Loaded repository count and first twenty repository rows.",
+        "empty": "No repositories were returned for this token.",
+        "error": "Could not load repositories."
+      }
+    },
+    "RepoSummaryCard": {
+      "radius": 8,
+      "background": "surface",
+      "border": "line",
+      "padding": 16,
+      "fields": ["repoOwner", "repoName", "branch", "destinationFolder", "lastPulledAt"]
+    },
+    "StatusCard": {
+      "radius": 8,
+      "background": "surface",
+      "border": "line",
+      "padding": 16,
+      "states": {
+        "ready": {
+          "title": "Ready to refresh",
+          "icon": "circle",
+          "color": "textMuted"
+        },
+        "pulling": {
+          "title": "Downloading",
+          "icon": "loader",
+          "color": "accent"
+        },
+        "success": {
+          "title": "Snapshot ready",
+          "icon": "check-circle",
+          "color": "success"
+        },
+        "warning": {
+          "title": "Local edits may be overwritten",
+          "icon": "alert-triangle",
+          "color": "warning"
+        },
+        "error": {
+          "title": "Pull failed",
+          "icon": "alert-circle",
+          "color": "danger"
+        }
+      }
+    },
+    "PdfListRow": {
+      "minHeight": 64,
+      "paddingHorizontal": 16,
+      "paddingVertical": 10,
+      "icon": "file-text",
+      "primaryText": "filename",
+      "secondaryText": "relativePath",
+      "trailingAction": "Open with",
+      "tapAction": "openAndroidChooser"
+    },
+    "WarningBanner": {
+      "radius": 8,
+      "background": "warningSoft",
+      "foreground": "textPrimary",
+      "icon": "alert-triangle",
+      "title": "GitHub is source of truth",
+      "body": "Pulling replaces the selected local snapshot with the repository version."
+    },
+    "BottomNavigation": {
+      "height": 72,
+      "background": "surface",
+      "borderTop": "line",
+      "activeColor": "accent",
+      "inactiveColor": "textMuted",
+      "labelStyle": "caption"
+    }
+  },
+  "screens": {
+    "Setup": {
+      "goal": "Collect or choose a GitHub repo, branch, optional GitHub token, and destination folder.",
+      "layout": "singleColumn",
+      "sections": [
+        "AppBar",
+        "GitHub repo TextField",
+        "Branch TextField",
+        "Destination FolderSelector",
+        "GitHub token optional secure TextField",
+        "RepositoryBrowser",
+        "WarningBanner",
+        "Save button"
+      ],
+      "validation": {
+        "repoUrl": "Accept https://github.com/{owner}/{repo} and strip .git suffix.",
+        "branch": "Default to main. Allow manual override.",
+        "destinationFolder": "Required before first pull.",
+        "token": "Optional. Store with Android EncryptedSharedPreferences or Jetpack Security. Required to browse private and account-scoped repositories.",
+        "repositoryBrowser": "Authenticated GitHub repository list populates repo URL and default branch when Use is tapped."
+      },
+      "states": ["empty", "partiallyComplete", "valid", "error"]
+    },
+    "PullHome": {
+      "goal": "Provide the main manual refresh workflow.",
+      "layout": "singleColumnWithPrimaryAction",
+      "sections": [
+        "RepoSummaryCard",
+        "PrimaryPullButton",
+        "StatusCard",
+        "Open Obsidian secondary button"
+      ],
+      "states": ["idle", "pulling", "success", "error", "missingPermission", "offline"],
+      "primaryActions": {
+        "Pull": "Download GitHub ZIP archive, extract to temp, verify, then refresh selected folder.",
+        "Open Obsidian": "Launch Obsidian package if installed, otherwise show folder path."
+      }
+    },
+    "PDFs": {
+      "goal": "Surface every pulled PDF in one searchable list.",
+      "layout": "searchPlusList",
+      "sections": [
+        "Search PDFs field",
+        "PDF count chip",
+        "PdfListRow collection",
+        "Empty state"
+      ],
+      "states": ["loadingIndex", "hasPdfs", "empty", "openFailed"],
+      "interactions": {
+        "search": "Filter by filename and relative path.",
+        "tapRow": "Open Android ACTION_VIEW chooser using a content URI.",
+        "longPress": "Copy relative path."
+      }
+    },
+    "Settings": {
+      "goal": "Manage repo, folder, credentials, and local snapshot.",
+      "layout": "groupedSettings",
+      "sections": [
+        "Repository card",
+        "RepositoryBrowser",
+        "Destination folder card",
+        "Credentials card",
+        "Safety card",
+        "Clear local snapshot danger action"
+      ],
+      "states": ["normal", "tokenConfigured", "permissionExpired", "clearConfirm"]
+    }
+  },
+  "interactions": {
+    "repositoryBrowser": [
+      "Read the GitHub token from the visible field or encrypted storage.",
+      "Request GET /user/repos with bearer authentication.",
+      "Show loading, empty, error, and loaded states.",
+      "Selecting a repository fills the repo URL and branch fields.",
+      "Do not clone every repo automatically; the user chooses the vault repo."
+    ],
+    "pullAlgorithm": [
+      "Validate repo, branch, token, and folder permission.",
+      "Download archive from GitHub codeload or API endpoint into app cache.",
+      "Extract archive into an app-private temporary directory.",
+      "Strip the archive root directory.",
+      "Build manifest with file paths, sizes, modified times, and hashes when feasible.",
+      "Refresh the selected vault folder from temp.",
+      "Remove files that no longer exist in the repository snapshot.",
+      "Persist last successful pull metadata.",
+      "Scan for PDFs and refresh PDF index."
+    ],
+    "failureHandling": [
+      "If download fails, keep existing vault folder untouched.",
+      "If extraction fails, delete temp data and show error.",
+      "If folder permission is missing, request folder access again.",
+      "If token is rejected, show credentials error and link to settings."
+    ],
+    "localEditSafety": [
+      "MVP shows a warning that local edits may be overwritten.",
+      "Future version may compare local manifest to last pull manifest before refresh.",
+      "App never writes Git commits and never pushes."
+    ],
+    "accessibility": [
+      "All touch targets must be at least 48dp.",
+      "Primary Pull button needs a clear content description.",
+      "Progress state must expose text status for screen readers.",
+      "Do not rely on color alone for success, warning, or error."
+    ]
+  },
+  "contentStyle": {
+    "voice": "plain, direct, utility-first",
+    "examples": {
+      "sourceOfTruthWarning": "GitHub is source of truth. Pulling replaces this local snapshot.",
+      "success": "Snapshot ready. Obsidian can open the selected folder.",
+      "pullError": "Pull failed. Your previous snapshot was kept.",
+      "pdfEmpty": "No PDFs found in this vault snapshot."
+    }
+  },
+  "implementationNotes": {
+    "recommendedStack": [
+      "Kotlin",
+      "Jetpack Compose",
+      "Material 3",
+      "Android Storage Access Framework",
+      "OkHttp",
+      "ZipInputStream or zip4j",
+      "EncryptedSharedPreferences"
+    ],
+    "minimumSdk": 26,
+    "packageNameProposal": "dev.gitpull.app",
+    "permissions": [
+      "INTERNET",
+      "Persisted Storage Access Framework URI permission through ACTION_OPEN_DOCUMENT_TREE"
+    ]
+  }
+}

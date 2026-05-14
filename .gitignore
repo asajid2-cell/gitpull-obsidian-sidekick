@@ -1,0 +1,18 @@
+# Gradle / Android build output
+.gradle/
+.kotlin/
+build/
+app/build/
+
+# IDE and local machine state
+.idea/
+local.properties
+*.iml
+
+# Logs and temporary artifacts
+*.log
+*.tmp
+*.bak
+
+# Android generated captures that are useful locally but not source
+captures/

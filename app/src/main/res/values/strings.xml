@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">gitpull</string>
+    <string name="source_of_truth_warning">GitHub is source of truth. Pulling replaces this local snapshot.</string>
+    <string name="snapshot_ready">Snapshot ready. Obsidian can open the selected folder.</string>
+    <string name="pull_failed">Pull failed. Your previous snapshot was kept.</string>
+    <string name="pdf_empty">No PDFs found in this vault snapshot.</string>
+</resources>
