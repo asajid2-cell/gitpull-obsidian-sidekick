@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -62,14 +63,24 @@ class GitpullUiTest {
     }
 
     @Test
-    fun githubBrowserSignInShowsMissingClientIdState() {
-        composeRule.onNodeWithText("Browser sign-in needs a GitHub OAuth client ID in this build.")
-            .performScrollTo()
-            .assertIsDisplayed()
-        composeRule.onNodeWithTag("github-sign-in")
-            .performScrollTo()
-            .assertIsDisplayed()
-            .assertIsNotEnabled()
+    fun githubBrowserSignInMatchesBuildConfiguration() {
+        if (BuildConfig.GITHUB_OAUTH_CLIENT_ID.isBlank()) {
+            composeRule.onNodeWithText("Browser sign-in needs a GitHub OAuth client ID in this build.")
+                .performScrollTo()
+                .assertIsDisplayed()
+            composeRule.onNodeWithTag("github-sign-in")
+                .performScrollTo()
+                .assertIsDisplayed()
+                .assertIsNotEnabled()
+        } else {
+            composeRule.onNodeWithText("Use browser sign-in to browse and pull repositories without pasting a token.")
+                .performScrollTo()
+                .assertIsDisplayed()
+            composeRule.onNodeWithTag("github-sign-in")
+                .performScrollTo()
+                .assertIsDisplayed()
+                .assertIsEnabled()
+        }
     }
 
     @Test

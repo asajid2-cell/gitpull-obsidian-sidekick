@@ -8,7 +8,7 @@
 .\gradlew.bat clean assembleDebug
 ```
 
-Browser GitHub sign-in is enabled when the APK is built with a GitHub OAuth app client ID that has Device Flow enabled:
+Browser GitHub sign-in is enabled by default with the public GitHub OAuth client ID in `gradle.properties`. To override it for a fork, build with another GitHub OAuth app client ID that has Device Flow enabled:
 
 ```powershell
 .\gradlew.bat clean assembleDebug -PGITPULL_GITHUB_CLIENT_ID='<github-oauth-client-id>'
@@ -25,7 +25,7 @@ app\build\outputs\apk\debug\app-debug.apk
 Latest audited APK SHA-256:
 
 ```text
-ca1d304aa02907c2aeeab091e676c6fc29e89959e9b7f3406f306313e2d67849
+c17c07a782d78b305b0bfb48b50d2170c8d1c30e080492e69cda89cf06dc15c8
 ```
 
 ## Test
