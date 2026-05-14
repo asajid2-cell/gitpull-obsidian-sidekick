@@ -3,13 +3,13 @@
 ## Artifact
 
 - APK: `apk/gitpull-debug.apk`
-- SHA-256: `ca1d304aa02907c2aeeab091e676c6fc29e89959e9b7f3406f306313e2d67849`
+- SHA-256: `c17c07a782d78b305b0bfb48b50d2170c8d1c30e080492e69cda89cf06dc15c8`
 - Android package: `dev.gitpull.app`
 - Minimum Android version: API 26
 
 This is a debug-signed APK produced by the local Android build. It is suitable for side-loading and testing, not Play Store distribution.
 
-Browser GitHub sign-in is implemented with GitHub OAuth Device Flow. The included APK was built without a project-specific OAuth client ID, so use the token fallback for this binary or rebuild from the `static` branch with `GITPULL_GITHUB_CLIENT_ID` to enable the browser sign-in button.
+Browser GitHub sign-in is implemented with GitHub OAuth Device Flow and is enabled in this APK with the app's public OAuth client ID. The token fallback remains available.
 
 ## Final Checks
 

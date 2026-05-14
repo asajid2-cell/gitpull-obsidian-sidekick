@@ -13,7 +13,7 @@ Pulls are staged before replacing the destination. If download or extraction fai
 The app supports:
 
 - Manual GitHub repository URL entry.
-- Browser GitHub sign-in in builds that include a GitHub OAuth client ID.
+- Browser GitHub sign-in with the app's public GitHub OAuth client ID.
 - Authenticated repository browsing with the saved GitHub credential.
 - A token fallback when browser sign-in is not enabled.
 

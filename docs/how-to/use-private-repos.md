@@ -4,7 +4,7 @@
 
 ## Use Browser Sign-In
 
-Browser sign-in needs an APK built with a GitHub OAuth client ID that has Device Flow enabled. The included debug APK does not embed a project-specific client ID, so it shows the sign-in button as unavailable.
+Browser sign-in is enabled in the included APK with the app's public GitHub OAuth client ID.
 
 When browser sign-in is enabled:
 

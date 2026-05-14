@@ -12,4 +12,4 @@ Do not publish GitHub tokens, vault contents, or device screenshots in public is
 
 ## Token Guidance
 
-Browser sign-in is preferred when the APK is built with a GitHub OAuth client ID. If you use the token fallback, use a fine-grained GitHub token with read-only repository contents access. Revoke saved GitHub credentials if a device is lost or a token is pasted into the wrong app.
+Browser sign-in is preferred. If you use the token fallback, use a fine-grained GitHub token with read-only repository contents access. Revoke saved GitHub credentials if a device is lost or a token is pasted into the wrong app.
