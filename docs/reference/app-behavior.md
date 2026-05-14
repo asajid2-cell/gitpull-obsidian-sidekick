@@ -13,7 +13,9 @@ Pulls are staged before replacing the destination. If download or extraction fai
 The app supports:
 
 - Manual GitHub repository URL entry.
-- Authenticated repository browsing with a GitHub token.
+- Browser GitHub sign-in in builds that include a GitHub OAuth client ID.
+- Authenticated repository browsing with the saved GitHub credential.
+- A token fallback when browser sign-in is not enabled.
 
 ## Destination Folder
 

@@ -9,12 +9,12 @@ You need:
 - The `gitpull` APK installed.
 - Obsidian Mobile installed.
 - A GitHub repository containing the vault files.
-- A GitHub token if the repository is private or if you want repository browsing.
+- GitHub sign-in enabled in your build, or a GitHub token if you use the included debug APK fallback.
 
 ## Steps
 
 1. Open `gitpull`.
-2. Paste a GitHub token if you want to browse private/account repositories.
+2. Sign in with GitHub. If the button says `OAuth client ID needed`, paste a GitHub token in the fallback field instead.
 3. Tap `Load` in the GitHub repositories card.
 4. Tap `Use` beside the repository that contains your vault.
 5. Confirm the branch.

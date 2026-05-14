@@ -4,8 +4,8 @@
 
 The app separates the workflow into a few pieces:
 
-- Settings store repository, branch, folder, and token.
-- GitHub clients download archives and list repositories.
+- Settings store repository, branch, folder, and whether a GitHub credential is saved.
+- GitHub clients handle browser sign-in, download archives, and list repositories.
 - Pull service stages and refreshes the destination.
 - PDF indexer scans the refreshed folder.
 - Compose UI exposes Setup, Pull, PDFs, and Settings screens.

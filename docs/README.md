@@ -10,7 +10,7 @@ These docs follow the Diataxis structure.
 ## How-To Guides
 
 - `how-to/refresh-vault.md`: repeat a normal pull.
-- `how-to/use-private-repos.md`: configure GitHub token-backed repository access.
+- `how-to/use-private-repos.md`: configure browser GitHub sign-in or token fallback access.
 - `how-to/open-pdfs.md`: find and open pulled PDFs.
 
 ## Reference
@@ -21,4 +21,4 @@ These docs follow the Diataxis structure.
 ## Explanation
 
 - `explanation/architecture.md`: why the app uses snapshot pulls.
-- `explanation/security.md`: token and data handling model.
+- `explanation/security.md`: GitHub credential and data handling model.
