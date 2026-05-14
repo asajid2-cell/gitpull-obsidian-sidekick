@@ -1,0 +1,14 @@
+# Local and generated files
+.gradle/
+.idea/
+.kotlin/
+build/
+app/build/
+local.properties
+*.log
+*.tmp
+*.bak
+
+# Local audit drafts
+PUBLIC_REPO_AUDIT.md
+PUBLIC_RELEASE_AUDIT_AND_PLAN.md
