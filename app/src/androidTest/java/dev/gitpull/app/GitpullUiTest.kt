@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -44,6 +45,7 @@ class GitpullUiTest {
         composeRule.onNodeWithTag("repo-field").assertIsDisplayed()
         composeRule.onNodeWithTag("branch-field").assertTextContains("main", substring = true)
         composeRule.onNodeWithText("Destination folder").assertIsDisplayed()
+        composeRule.onNodeWithTag("github-sign-in").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("token-field").assertIsDisplayed()
         composeRule.onNodeWithTag("load-repositories").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("GitHub is source of truth").performScrollTo().assertIsDisplayed()
@@ -51,12 +53,23 @@ class GitpullUiTest {
     }
 
     @Test
-    fun repositoryBrowserRequiresGitHubToken() {
+    fun repositoryBrowserRequiresGitHubSignIn() {
         composeRule.onNodeWithTag("load-repositories").performScrollTo().performClick()
 
-        composeRule.onNodeWithText("Save or paste a GitHub token before loading repositories.")
+        composeRule.onNodeWithText("Sign in with GitHub before loading repositories.")
             .performScrollTo()
             .assertIsDisplayed()
+    }
+
+    @Test
+    fun githubBrowserSignInShowsMissingClientIdState() {
+        composeRule.onNodeWithText("Browser sign-in needs a GitHub OAuth client ID in this build.")
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("github-sign-in")
+            .performScrollTo()
+            .assertIsDisplayed()
+            .assertIsNotEnabled()
     }
 
     @Test
@@ -86,7 +99,8 @@ class GitpullUiTest {
         composeRule.onNodeWithTag("nav-settings").performClick()
         composeRule.onNodeWithText("Repository and safety").assertIsDisplayed()
         composeRule.onNodeWithText("Repository").assertIsDisplayed()
-        composeRule.onNodeWithText("Credentials").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("GitHub sign-in").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Token fallback").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("clear-snapshot").performScrollTo().assertIsDisplayed()
     }
 
@@ -109,6 +123,7 @@ class GitpullUiTest {
         composeRule.onNodeWithTag("branch-field").assertHeightIsAtLeast(48.dp)
         composeRule.onNodeWithTag("token-field").assertHeightIsAtLeast(48.dp)
         composeRule.onNodeWithTag("load-repositories").performScrollTo().assertHeightIsAtLeast(48.dp)
+        composeRule.onNodeWithTag("github-sign-in").performScrollTo().assertHeightIsAtLeast(48.dp)
         composeRule.onNodeWithTag("save-setup").performScrollTo().assertHeightIsAtLeast(48.dp)
 
         seedConfiguredApp()

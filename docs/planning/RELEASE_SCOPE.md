@@ -5,7 +5,9 @@
 ## In Scope
 
 - Manual repository URL entry.
-- GitHub token-backed repository browsing.
+- Browser GitHub sign-in through GitHub OAuth Device Flow.
+- GitHub token fallback for builds or users that do not use browser sign-in.
+- Authenticated repository browsing.
 - Pull-only archive download from GitHub.
 - Snapshot extraction and folder refresh.
 - Failure preservation for the previous usable snapshot.

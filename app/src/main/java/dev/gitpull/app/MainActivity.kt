@@ -34,6 +34,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Article
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
@@ -85,6 +86,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import dev.gitpull.app.core.AppConfig
 import dev.gitpull.app.core.GitHubArchiveClient
+import dev.gitpull.app.core.GitHubOAuthClient
 import dev.gitpull.app.core.GitHubRepository
 import dev.gitpull.app.core.GitHubRepositoryClient
 import dev.gitpull.app.core.PdfItem
@@ -101,6 +103,7 @@ import dev.gitpull.app.data.AndroidSnapshotTools
 import dev.gitpull.app.data.ContentResolverSnapshotWriter
 import dev.gitpull.app.data.SecureTokenStore
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -112,7 +115,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             GitpullTheme {
-                GitpullApp(this)
+                GitpullApp(activity = this)
             }
         }
     }
@@ -164,6 +167,7 @@ private fun GitpullTheme(content: @Composable () -> Unit) {
 private fun GitpullApp(activity: ComponentActivity) {
     val settingsRepository = remember { AndroidSettingsRepository(activity) }
     val tokenStore = remember { SecureTokenStore(activity) }
+    val oauthClient = remember { GitHubOAuthClient(BuildConfig.GITHUB_OAUTH_CLIENT_ID) }
     val pdfIndexer = remember { AndroidPdfIndexer(activity) }
     val manifestBuilder = remember { AndroidSnapshotManifestBuilder(activity) }
     val scope = rememberCoroutineScope()
@@ -181,9 +185,62 @@ private fun GitpullApp(activity: ComponentActivity) {
     var repoBrowserLoading by remember { mutableStateOf(false) }
     var repoBrowserMessage by remember { mutableStateOf<String?>(null) }
     var repoBrowserItems by remember { mutableStateOf(emptyList<GitHubRepository>()) }
+    var oauthLoading by remember { mutableStateOf(false) }
 
     LaunchedEffect(config.destinationTreeUri) {
         pdfs = pdfIndexer.indexTree(config.destinationTreeUri)
+    }
+
+    val startGitHubSignIn: () -> Unit = {
+        if (!oauthClient.isConfigured) {
+            dialogMessage = "GitHub sign-in needs a GitHub OAuth client ID in this build."
+        } else {
+            scope.launch {
+                oauthLoading = true
+                repoBrowserMessage = "Starting GitHub sign-in..."
+                val deviceResult = withContext(Dispatchers.IO) {
+                    runCatching { oauthClient.requestDeviceCode() }
+                }
+                deviceResult.onSuccess { device ->
+                    repoBrowserMessage = "Enter ${device.userCode} in the GitHub browser window, then return here."
+                    try {
+                        activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(device.verificationUri)))
+                    } catch (_: ActivityNotFoundException) {
+                        dialogMessage = "Open ${device.verificationUri} and enter ${device.userCode}."
+                    }
+
+                    val expiresAtMillis = System.currentTimeMillis() + device.expiresInSeconds * 1000L
+                    var intervalSeconds = device.intervalSeconds.coerceAtLeast(5)
+                    while (System.currentTimeMillis() < expiresAtMillis) {
+                        delay(intervalSeconds * 1000L)
+                        val pollResult = withContext(Dispatchers.IO) {
+                            runCatching { oauthClient.pollDeviceCode(device.deviceCode) }
+                        }
+                        pollResult.onSuccess { token ->
+                            tokenStore.save(token)
+                            val next = config.copy(tokenConfigured = true)
+                            config = next
+                            settingsRepository.save(next)
+                            repoBrowserMessage = "Signed in with GitHub."
+                            oauthLoading = false
+                            return@launch
+                        }
+                        val error = pollResult.exceptionOrNull()
+                        if (error is GitHubOAuthClient.AuthorizationPendingException) {
+                            if (error.message == "slow_down") intervalSeconds += 5
+                        } else {
+                            dialogMessage = error?.message ?: "GitHub sign-in failed."
+                            oauthLoading = false
+                            return@launch
+                        }
+                    }
+                    dialogMessage = "GitHub sign-in expired. Try again."
+                }.onFailure { error ->
+                    dialogMessage = error.message ?: "GitHub sign-in failed."
+                }
+                oauthLoading = false
+            }
+        }
     }
 
     val folderLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
@@ -200,7 +257,7 @@ private fun GitpullApp(activity: ComponentActivity) {
     val loadRepositories: (String) -> Unit = { tokenOverride ->
         val token = tokenOverride.ifBlank { tokenStore.load().orEmpty() }.trim()
         if (token.isBlank()) {
-            repoBrowserMessage = "Save or paste a GitHub token before loading repositories."
+            repoBrowserMessage = "Sign in with GitHub before loading repositories."
         } else {
             scope.launch {
                 repoBrowserLoading = true
@@ -210,7 +267,7 @@ private fun GitpullApp(activity: ComponentActivity) {
                 }
                 result.onSuccess { repos ->
                     repoBrowserItems = repos
-                    repoBrowserMessage = if (repos.isEmpty()) "No repositories were returned for this token." else "Loaded ${repos.size} repositories."
+                    repoBrowserMessage = if (repos.isEmpty()) "No repositories were returned for this GitHub account." else "Loaded ${repos.size} repositories."
                 }.onFailure { error ->
                     repoBrowserMessage = "Could not load repositories. ${error.message.orEmpty()}"
                 }
@@ -227,6 +284,18 @@ private fun GitpullApp(activity: ComponentActivity) {
             repoBrowserLoading = repoBrowserLoading,
             repoBrowserMessage = repoBrowserMessage,
             repoBrowserItems = repoBrowserItems,
+            tokenConfigured = config.tokenConfigured,
+            oauthConfigured = oauthClient.isConfigured,
+            oauthLoading = oauthLoading,
+            onStartGitHubSignIn = startGitHubSignIn,
+            onSignOut = {
+                tokenStore.clear()
+                val next = config.copy(tokenConfigured = false)
+                config = next
+                settingsRepository.save(next)
+                repoBrowserItems = emptyList()
+                repoBrowserMessage = "Signed out of GitHub."
+            },
             onLoadRepositories = loadRepositories,
             onSave = { repoUrl, branch, token ->
                 val parsed = RepoUrlParser.parse(repoUrl, branch)
@@ -238,11 +307,16 @@ private fun GitpullApp(activity: ComponentActivity) {
                     setupError = "Choose a destination folder first"
                     return@SetupScreen
                 }
-                if (token.isNotBlank()) tokenStore.save(token) else tokenStore.clear()
+                val credentialConfigured = if (token.isNotBlank()) {
+                    tokenStore.save(token)
+                    true
+                } else {
+                    config.tokenConfigured
+                }
                 val next = config.copy(
                     repoUrl = repoUrl.trim(),
                     branch = branch.ifBlank { RepoRef.DEFAULT_BRANCH },
-                    tokenConfigured = token.isNotBlank()
+                    tokenConfigured = credentialConfigured
                 )
                 settingsRepository.save(next)
                 config = next
@@ -353,6 +427,10 @@ private fun GitpullApp(activity: ComponentActivity) {
                     repoBrowserLoading = repoBrowserLoading,
                     repoBrowserMessage = repoBrowserMessage,
                     repoBrowserItems = repoBrowserItems,
+                    tokenConfigured = config.tokenConfigured,
+                    oauthConfigured = oauthClient.isConfigured,
+                    oauthLoading = oauthLoading,
+                    onStartGitHubSignIn = startGitHubSignIn,
                     onLoadRepositories = { loadRepositories("") },
                     onSaveRepo = { repoUrl, branch ->
                         val parsed = RepoUrlParser.parse(repoUrl, branch)
@@ -376,6 +454,14 @@ private fun GitpullApp(activity: ComponentActivity) {
                             config = next
                             settingsRepository.save(next)
                         }
+                    },
+                    onSignOut = {
+                        tokenStore.clear()
+                        val next = config.copy(tokenConfigured = false)
+                        config = next
+                        settingsRepository.save(next)
+                        repoBrowserItems = emptyList()
+                        repoBrowserMessage = "Signed out of GitHub."
                     },
                     onClearSnapshot = { confirmClear = true }
                 )
@@ -463,6 +549,11 @@ private fun SetupScreen(
     repoBrowserLoading: Boolean,
     repoBrowserMessage: String?,
     repoBrowserItems: List<GitHubRepository>,
+    tokenConfigured: Boolean,
+    oauthConfigured: Boolean,
+    oauthLoading: Boolean,
+    onStartGitHubSignIn: () -> Unit,
+    onSignOut: () -> Unit,
     onLoadRepositories: (String) -> Unit,
     onSave: (String, String, String) -> Unit
 ) {
@@ -497,11 +588,18 @@ private fun SetupScreen(
                 destination = initialConfig.destinationTreeUri,
                 onChooseFolder = onChooseFolder
             )
+            GitHubAuthCard(
+                tokenConfigured = tokenConfigured,
+                oauthConfigured = oauthConfigured,
+                oauthLoading = oauthLoading,
+                onStartGitHubSignIn = onStartGitHubSignIn,
+                onSignOut = onSignOut
+            )
             OutlinedTextField(
                 value = token,
                 onValueChange = { token = it },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag("token-field"),
-                label = { Text("GitHub token optional") },
+                label = { Text("Personal access token fallback") },
                 singleLine = true
             )
             RepositoryBrowserSection(
@@ -623,9 +721,14 @@ private fun SettingsScreen(
     repoBrowserLoading: Boolean,
     repoBrowserMessage: String?,
     repoBrowserItems: List<GitHubRepository>,
+    tokenConfigured: Boolean,
+    oauthConfigured: Boolean,
+    oauthLoading: Boolean,
+    onStartGitHubSignIn: () -> Unit,
     onLoadRepositories: () -> Unit,
     onSaveRepo: (String, String) -> Unit,
     onSaveToken: (String) -> Unit,
+    onSignOut: () -> Unit,
     onClearSnapshot: () -> Unit
 ) {
     var repoUrl by remember(config.repoUrl) { mutableStateOf(config.repoUrl) }
@@ -673,10 +776,17 @@ private fun SettingsScreen(
             }
         )
         FolderSelectorCard(config.destinationTreeUri, onChooseFolder)
+        GitHubAuthCard(
+            tokenConfigured = tokenConfigured,
+            oauthConfigured = oauthConfigured,
+            oauthLoading = oauthLoading,
+            onStartGitHubSignIn = onStartGitHubSignIn,
+            onSignOut = onSignOut
+        )
         ComponentCard {
-            Text("Credentials", style = MaterialTheme.typography.titleMedium)
+            Text("Token fallback", style = MaterialTheme.typography.titleMedium)
             Text(
-                if (config.tokenConfigured) "GitHub token configured" else "GitHub token optional",
+                if (config.tokenConfigured) "A GitHub credential is saved" else "Paste a token only if browser sign-in is not available",
                 color = Tokens.TextMuted,
                 style = MaterialTheme.typography.bodyMedium
             )
@@ -684,7 +794,7 @@ private fun SettingsScreen(
             OutlinedTextField(
                 value = token,
                 onValueChange = { token = it },
-                label = { Text("GitHub token optional") },
+                label = { Text("Personal access token fallback") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -710,6 +820,59 @@ private fun SettingsScreen(
 }
 
 @Composable
+private fun GitHubAuthCard(
+    tokenConfigured: Boolean,
+    oauthConfigured: Boolean,
+    oauthLoading: Boolean,
+    onStartGitHubSignIn: () -> Unit,
+    onSignOut: () -> Unit
+) {
+    ComponentCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.AccountCircle, contentDescription = null, tint = Tokens.Accent)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("GitHub sign-in", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    when {
+                        tokenConfigured -> "Signed in. Repository browsing and private pulls can use your GitHub account."
+                        oauthConfigured -> "Use browser sign-in to browse and pull repositories without pasting a token."
+                        else -> "Browser sign-in needs a GitHub OAuth client ID in this build."
+                    },
+                    color = Tokens.TextMuted,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = onStartGitHubSignIn,
+                enabled = !oauthLoading && oauthConfigured,
+                modifier = Modifier.height(48.dp).testTag("github-sign-in")
+            ) {
+                if (oauthLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                } else {
+                    Text(
+                        when {
+                            tokenConfigured -> "Sign in again"
+                            oauthConfigured -> "Sign in with GitHub"
+                            else -> "OAuth client ID needed"
+                        }
+                    )
+                }
+            }
+            if (tokenConfigured) {
+                OutlinedButton(onClick = onSignOut, modifier = Modifier.height(48.dp).testTag("github-sign-out")) {
+                    Text("Sign out")
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun RepositoryBrowserSection(
     loading: Boolean,
     message: String?,
@@ -722,7 +885,7 @@ private fun RepositoryBrowserSection(
             Column(Modifier.weight(1f)) {
                 Text("GitHub repositories", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "Load repos available to your GitHub token, then choose the vault repo.",
+                    "Load repos available to your GitHub account, then choose the vault repo.",
                     color = Tokens.TextMuted,
                     style = MaterialTheme.typography.bodyMedium
                 )

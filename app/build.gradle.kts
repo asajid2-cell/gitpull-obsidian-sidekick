@@ -4,6 +4,8 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+fun String.asBuildConfigString(): String = "\"" + replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+
 android {
     namespace = "dev.gitpull.app"
     compileSdk = 36
@@ -19,6 +21,12 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+
+        val githubOAuthClientId = providers.gradleProperty("GITPULL_GITHUB_CLIENT_ID")
+            .orElse(providers.environmentVariable("GITPULL_GITHUB_CLIENT_ID"))
+            .orElse("")
+            .get()
+        buildConfigField("String", "GITHUB_OAUTH_CLIENT_ID", githubOAuthClientId.asBuildConfigString())
     }
 
     buildTypes {

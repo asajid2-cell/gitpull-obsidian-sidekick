@@ -8,6 +8,14 @@
 .\gradlew.bat clean assembleDebug
 ```
 
+Browser GitHub sign-in is enabled when the APK is built with a GitHub OAuth app client ID that has Device Flow enabled:
+
+```powershell
+.\gradlew.bat clean assembleDebug -PGITPULL_GITHUB_CLIENT_ID='<github-oauth-client-id>'
+```
+
+The client ID can also be supplied through the `GITPULL_GITHUB_CLIENT_ID` environment variable. Builds without a client ID keep the manual token fallback available and show the GitHub sign-in button as unavailable.
+
 The debug APK is produced at:
 
 ```text
@@ -17,7 +25,7 @@ app\build\outputs\apk\debug\app-debug.apk
 Latest audited APK SHA-256:
 
 ```text
-8e07c5cd784adf8460dba48fe5abcd3b62478c41a4cee197a8818ac723a9f172
+ca1d304aa02907c2aeeab091e676c6fc29e89959e9b7f3406f306313e2d67849
 ```
 
 ## Test
@@ -29,7 +37,7 @@ $env:GRADLE_OPTS='-Xmx1024m -Dfile.encoding=UTF-8'
 
 ## Runtime Flow
 
-1. Paste a GitHub token when you want private/account repo browsing.
+1. Sign in with GitHub in the app, or paste a GitHub token only as a fallback.
 2. Tap `Load` in the GitHub repositories card and choose the vault repo, or paste a GitHub repo URL manually.
 3. Keep `main` or enter another branch.
 4. Choose an Android destination folder using the folder picker.
@@ -43,7 +51,7 @@ Pixel 9 Pro XL walkthrough screenshots are in `docs/assets/screenshots/`, with t
 
 ## Current Validation State
 
-The app builds, installs, passes unit/instrumentation/lint validation, browses GitHub repositories with a token, pulls public GitHub snapshots, refreshes SAF-selected folders, indexes PDFs, opens pulled folders in Obsidian Mobile, and has live private GitHub fixture validation for Markdown, `.obsidian`, image, and PDF assets.
+The app builds, installs, passes unit/instrumentation/lint validation, supports browser GitHub sign-in through GitHub's device flow, keeps a token fallback, pulls public GitHub snapshots, refreshes SAF-selected folders, indexes PDFs, opens pulled folders in Obsidian Mobile, and has live private GitHub fixture validation for Markdown, `.obsidian`, image, and PDF assets.
 
 Live private GitHub validation used a controlled fixture repository containing Markdown, `.obsidian`, image, and PDF assets. The exact private fixture identity is not required for normal use.
 
