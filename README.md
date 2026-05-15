@@ -15,7 +15,7 @@ This is a debug-signed APK for sideload testing. It is not a Play Store release 
 Verify the APK before installing:
 
 ```text
-c17c07a782d78b305b0bfb48b50d2170c8d1c30e080492e69cda89cf06dc15c8  apk/gitpull-debug.apk
+373c197b5ee94995fbedc3ee01b1eace70c523c8e04a96cb8275b9d1e936063e  apk/gitpull-debug.apk
 ```
 
 The included APK has browser GitHub sign-in enabled through the app's public OAuth client ID. The token fallback is still available.
@@ -23,6 +23,7 @@ The included APK has browser GitHub sign-in enabled through the app's public OAu
 ## What It Does
 
 - Browse GitHub repositories after browser sign-in, or with the token fallback.
+- Copy the GitHub device code and re-check sign-in when returning from GitHub.
 - Pull a selected repository branch into an Android folder.
 - Preserve the previous usable snapshot if a pull fails.
 - Index pulled PDFs in a dedicated tab.
