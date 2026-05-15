@@ -14,7 +14,7 @@ The app supports:
 
 - Manual GitHub repository URL entry.
 - Browser GitHub sign-in with the app's public GitHub OAuth client ID.
-- Authenticated repository browsing with the saved GitHub credential.
+- Authenticated repository browsing with the saved GitHub credential. The browser loads one GitHub API page at a time and uses `Load more` for the next page.
 - A token fallback when browser sign-in is not enabled.
 
 ## Destination Folder
