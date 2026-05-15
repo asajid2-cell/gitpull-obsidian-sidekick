@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">gitpull vault arrow logo option A</title>
+  <desc id="desc">Rounded app icon with a vault folder, pull arrow, and note lines, designed to fit square and circular launcher masks.</desc>
+  <defs>
+    <linearGradient id="bg" x1="152" y1="128" x2="872" y2="896" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#111827"/>
+      <stop offset="1" stop-color="#312E81"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="360" y1="208" x2="664" y2="706" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#22C55E"/>
+      <stop offset="1" stop-color="#7C3AED"/>
+    </linearGradient>
+  </defs>
+  <rect x="96" y="96" width="832" height="832" rx="232" fill="url(#bg)"/>
+  <circle cx="512" cy="512" r="356" fill="none" stroke="#FFFFFF" stroke-opacity=".08" stroke-width="32"/>
+  <path d="M254 392c0-42 34-76 76-76h134l56 58h174c42 0 76 34 76 76v218c0 42-34 76-76 76H330c-42 0-76-34-76-76V392Z" fill="#FFFFFF"/>
+  <path d="M292 438c0-28 22-50 50-50h123l54 56h175c28 0 50 22 50 50v38H292v-94Z" fill="#EDE9FE"/>
+  <path d="M333 559h358" stroke="#CBD5E1" stroke-width="34" stroke-linecap="round"/>
+  <path d="M333 636h258" stroke="#CBD5E1" stroke-width="34" stroke-linecap="round"/>
+  <path d="M512 202v242" stroke="url(#accent)" stroke-width="82" stroke-linecap="round"/>
+  <path d="M382 358 512 488l130-130" fill="none" stroke="url(#accent)" stroke-width="82" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M512 202v242" stroke="#FFFFFF" stroke-opacity=".22" stroke-width="26" stroke-linecap="round"/>
+</svg>

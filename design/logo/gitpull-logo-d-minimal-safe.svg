@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">gitpull minimal safe logo option D</title>
+  <desc id="desc">Minimal high-contrast pull arrow and vault card with extra padding for square and circular masks.</desc>
+  <defs>
+    <linearGradient id="bg" x1="144" y1="128" x2="884" y2="900" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7C3AED"/>
+      <stop offset="1" stop-color="#111827"/>
+    </linearGradient>
+  </defs>
+  <rect x="96" y="96" width="832" height="832" rx="252" fill="url(#bg)"/>
+  <path d="M312 553c0-45 36-81 81-81h238c45 0 81 36 81 81v125c0 45-36 81-81 81H393c-45 0-81-36-81-81V553Z" fill="#F8FAFC"/>
+  <path d="M382 604h260" stroke="#94A3B8" stroke-width="34" stroke-linecap="round"/>
+  <path d="M422 672h180" stroke="#94A3B8" stroke-width="34" stroke-linecap="round"/>
+  <path d="M512 246v304" stroke="#F8FAFC" stroke-width="96" stroke-linecap="round"/>
+  <path d="M370 424 512 566l142-142" fill="none" stroke="#F8FAFC" stroke-width="96" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M512 246v288" stroke="#22C55E" stroke-width="46" stroke-linecap="round"/>
+  <path d="M423 445 512 534l89-89" fill="none" stroke="#22C55E" stroke-width="46" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

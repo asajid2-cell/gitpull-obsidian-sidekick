@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">gitpull branch drop logo option B</title>
+  <desc id="desc">Circular icon with Git branch nodes becoming a downward pull arrow into a vault card.</desc>
+  <defs>
+    <linearGradient id="bg" x1="156" y1="112" x2="870" y2="900" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0F172A"/>
+      <stop offset=".58" stop-color="#1E293B"/>
+      <stop offset="1" stop-color="#111827"/>
+    </linearGradient>
+    <linearGradient id="pull" x1="296" y1="240" x2="730" y2="708" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#38BDF8"/>
+      <stop offset="1" stop-color="#22C55E"/>
+    </linearGradient>
+  </defs>
+  <rect x="96" y="96" width="832" height="832" rx="256" fill="url(#bg)"/>
+  <circle cx="512" cy="512" r="338" fill="#F8FAFC" fill-opacity=".06"/>
+  <path d="M313 631c0-50 40-90 90-90h218c50 0 90 40 90 90v40c0 50-40 90-90 90H403c-50 0-90-40-90-90v-40Z" fill="#F8FAFC"/>
+  <path d="M373 626h278" stroke="#CBD5E1" stroke-width="32" stroke-linecap="round"/>
+  <path d="M411 684h202" stroke="#CBD5E1" stroke-width="32" stroke-linecap="round"/>
+  <path d="M512 262v286" stroke="url(#pull)" stroke-width="76" stroke-linecap="round"/>
+  <path d="M398 438 512 552l114-114" fill="none" stroke="url(#pull)" stroke-width="76" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M384 282h-28c-62 0-112 50-112 112v72" fill="none" stroke="#A78BFA" stroke-width="48" stroke-linecap="round"/>
+  <circle cx="384" cy="282" r="50" fill="#A78BFA"/>
+  <circle cx="244" cy="466" r="42" fill="#A78BFA"/>
+  <circle cx="512" cy="262" r="54" fill="#22C55E"/>
+</svg>
