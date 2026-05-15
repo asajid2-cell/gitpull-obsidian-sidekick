@@ -11,12 +11,12 @@ Result:
 
 - Build: PASS
 - Unit tests: PASS, 26 tests, 0 failures, 0 errors, 1 skipped live fixture test
-- Connected Android tests: PASS, 8 tests, 0 failures on `Pixel_9_Pro_XL(AVD) - 16`
+- Connected Android tests: PASS, 9 tests, 0 failures on `Pixel_9_Pro_XL(AVD) - 16`
 - Lint: PASS, 0 errors
 - GitHub OAuth Device Flow client tests: PASS, device-code request, token polling, and pending-authorization handling against a mock server
 - GitHub repository pagination tests: PASS, repository browser requests one page at a time and reports when another page is available
-- Live GitHub OAuth Device Flow smoke: PASS, `POST https://github.com/login/device/code` returned a user code and `https://github.com/login/device`
-- GitHub sign-in UX: PASS, pending sign-in keeps the code visible, supports copying it, and polls again when the app resumes.
+- Live GitHub OAuth Device Flow smoke: PASS, `POST https://github.com/login/device/code` returned a user code and `https://github.com/login/device`; polling the unapproved live code returned `authorization_pending`.
+- GitHub sign-in UX: PASS, pending sign-in keeps the code visible across activity recreation, supports copying it, keeps `Check sign-in` available, and polls again when the app resumes.
 - Launcher icon: PASS, Branch Drop vector packaged as adaptive foreground and monochrome icon.
 - Visual walkthrough: PASS, Pixel 9 Pro XL screenshots captured at 1344x2992 with title and bottom navigation outside system-bar cutouts.
 

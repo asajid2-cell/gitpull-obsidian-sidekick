@@ -12,7 +12,7 @@ When browser sign-in is enabled:
 2. Tap `Sign in with GitHub`.
 3. Tap `Copy code`.
 4. Paste the code into the GitHub browser window.
-5. Return to `gitpull`. The app re-checks sign-in when it resumes; tap `Check sign-in` if you want to retry immediately.
+5. Return to `gitpull`. The same sign-in session stays visible; the app re-checks when it resumes, and you can tap `Check sign-in` to retry immediately.
 6. Tap `Load` in the GitHub repositories card.
 7. Tap `Load more` if your repository is not on the first page.
 8. Choose the repository.
