@@ -16,7 +16,8 @@ class GitHubRepositoryClientTest {
         assertEquals("application/vnd.github+json", request.header("Accept"))
         assertEquals("/user/repos", request.url.encodedPath)
         assertEquals("2", request.url.queryParameter("page"))
-        assertEquals("100", request.url.queryParameter("per_page"))
+        assertEquals("50", request.url.queryParameter("per_page"))
+        assertEquals("owner,collaborator,organization_member", request.url.queryParameter("affiliation"))
     }
 
     @Test
@@ -61,7 +62,7 @@ class GitHubRepositoryClientTest {
     }
 
     @Test
-    fun listRepositoriesSendsBearerToken() {
+    fun listRepositoriesPageSendsBearerToken() {
         MockWebServer().use { server ->
             server.enqueue(
                 MockResponse()
@@ -81,13 +82,47 @@ class GitHubRepositoryClientTest {
             )
             server.start()
 
-            val repos = GitHubRepositoryClient(apiBaseUrl = server.url("/").toString())
-                .listRepositories("secret-token")
+            val page = GitHubRepositoryClient(apiBaseUrl = server.url("/").toString())
+                .listRepositoriesPage("secret-token")
 
             val request = server.takeRequest()
-            assertEquals("/user/repos?per_page=100&page=1&affiliation=owner%2Ccollaborator%2Corganization_member&sort=updated", request.path)
+            assertEquals("/user/repos?per_page=50&page=1&affiliation=owner%2Ccollaborator%2Corganization_member&sort=updated", request.path)
             assertEquals("Bearer secret-token", request.getHeader("Authorization"))
-            assertEquals("owner/vault", repos.single().fullName)
+            assertEquals("owner/vault", page.repositories.single().fullName)
+            assertEquals(null, page.nextPage)
+        }
+    }
+
+    @Test
+    fun listRepositoriesPageReportsNextPageWhenFull() {
+        MockWebServer().use { server ->
+            val fullPage = buildString {
+                append("[")
+                repeat(50) { index ->
+                    if (index > 0) append(",")
+                    append(
+                        """
+                        {
+                          "full_name": "owner/repo-$index",
+                          "html_url": "https://github.com/owner/repo-$index",
+                          "default_branch": "main",
+                          "private": false
+                        }
+                        """.trimIndent()
+                    )
+                }
+                append("]")
+            }
+            server.enqueue(MockResponse().setResponseCode(200).setBody(fullPage))
+            server.start()
+
+            val page = GitHubRepositoryClient(apiBaseUrl = server.url("/").toString())
+                .listRepositoriesPage("secret-token")
+
+            assertEquals(50, page.repositories.size)
+            assertEquals("owner/repo-0", page.repositories.first().fullName)
+            assertEquals(2, page.nextPage)
+            assertEquals("1", server.takeRequest().requestUrl?.queryParameter("page"))
         }
     }
 }

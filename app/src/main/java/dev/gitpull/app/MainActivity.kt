@@ -200,9 +200,33 @@ private fun GitpullApp(activity: ComponentActivity) {
     var repoBrowserLoading by remember { mutableStateOf(false) }
     var repoBrowserMessage by remember { mutableStateOf<String?>(null) }
     var repoBrowserItems by remember { mutableStateOf(emptyList<GitHubRepository>()) }
+    var repoBrowserNextPage by remember { mutableStateOf<Int?>(null) }
     var oauthLoading by remember { mutableStateOf(false) }
     var pendingSignIn by remember { mutableStateOf<PendingGitHubSignIn?>(null) }
     var signInPollRequest by remember { mutableStateOf(0) }
+
+    val loadRepositoryPage: (String, Int, Boolean) -> Unit = { token, page, append ->
+        scope.launch {
+            repoBrowserLoading = true
+            repoBrowserMessage = if (append) "Loading more repositories..." else "Loading repositories..."
+            val result = withContext(Dispatchers.IO) {
+                runCatching { GitHubRepositoryClient().listRepositoriesPage(token, page) }
+            }
+            result.onSuccess { repoPage ->
+                val nextItems = if (append) repoBrowserItems + repoPage.repositories else repoPage.repositories
+                repoBrowserItems = nextItems
+                repoBrowserNextPage = repoPage.nextPage
+                repoBrowserMessage = if (nextItems.isEmpty()) {
+                    "No repositories were returned for this GitHub account."
+                } else {
+                    "Loaded ${nextItems.size} repositories."
+                }
+            }.onFailure { error ->
+                repoBrowserMessage = "Could not load repositories. ${error.message.orEmpty()}"
+            }
+            repoBrowserLoading = false
+        }
+    }
 
     LaunchedEffect(config.destinationTreeUri) {
         pdfs = pdfIndexer.indexTree(config.destinationTreeUri)
@@ -246,6 +270,7 @@ private fun GitpullApp(activity: ComponentActivity) {
                 settingsRepository.save(next)
                 pendingSignIn = null
                 repoBrowserMessage = "Signed in with GitHub."
+                loadRepositoryPage(token, 1, false)
                 return@LaunchedEffect
             }
 
@@ -318,20 +343,19 @@ private fun GitpullApp(activity: ComponentActivity) {
         if (token.isBlank()) {
             repoBrowserMessage = "Sign in with GitHub before loading repositories."
         } else {
-            scope.launch {
-                repoBrowserLoading = true
-                repoBrowserMessage = null
-                val result = withContext(Dispatchers.IO) {
-                    runCatching { GitHubRepositoryClient().listRepositories(token) }
-                }
-                result.onSuccess { repos ->
-                    repoBrowserItems = repos
-                    repoBrowserMessage = if (repos.isEmpty()) "No repositories were returned for this GitHub account." else "Loaded ${repos.size} repositories."
-                }.onFailure { error ->
-                    repoBrowserMessage = "Could not load repositories. ${error.message.orEmpty()}"
-                }
-                repoBrowserLoading = false
-            }
+            loadRepositoryPage(token, 1, false)
+        }
+    }
+
+    val loadMoreRepositories: () -> Unit = {
+        val nextPage = repoBrowserNextPage
+        val token = tokenStore.load().orEmpty().trim()
+        if (token.isBlank()) {
+            repoBrowserMessage = "Sign in with GitHub before loading more repositories."
+        } else if (nextPage == null) {
+            repoBrowserMessage = "All loaded repositories are already shown."
+        } else {
+            loadRepositoryPage(token, nextPage, true)
         }
     }
 
@@ -343,6 +367,7 @@ private fun GitpullApp(activity: ComponentActivity) {
             repoBrowserLoading = repoBrowserLoading,
             repoBrowserMessage = repoBrowserMessage,
             repoBrowserItems = repoBrowserItems,
+            repoBrowserCanLoadMore = repoBrowserNextPage != null,
             tokenConfigured = config.tokenConfigured,
             oauthConfigured = oauthClient.isConfigured,
             oauthLoading = oauthLoading,
@@ -357,9 +382,11 @@ private fun GitpullApp(activity: ComponentActivity) {
                 config = next
                 settingsRepository.save(next)
                 repoBrowserItems = emptyList()
+                repoBrowserNextPage = null
                 repoBrowserMessage = "Signed out of GitHub."
             },
             onLoadRepositories = loadRepositories,
+            onLoadMoreRepositories = loadMoreRepositories,
             onSave = { repoUrl, branch, token ->
                 val parsed = RepoUrlParser.parse(repoUrl, branch)
                 if (parsed.isFailure) {
@@ -490,6 +517,7 @@ private fun GitpullApp(activity: ComponentActivity) {
                     repoBrowserLoading = repoBrowserLoading,
                     repoBrowserMessage = repoBrowserMessage,
                     repoBrowserItems = repoBrowserItems,
+                    repoBrowserCanLoadMore = repoBrowserNextPage != null,
                     tokenConfigured = config.tokenConfigured,
                     oauthConfigured = oauthClient.isConfigured,
                     oauthLoading = oauthLoading,
@@ -498,6 +526,7 @@ private fun GitpullApp(activity: ComponentActivity) {
                     onCheckGitHubSignIn = { signInPollRequest += 1 },
                     onCopyGitHubCode = { repoBrowserMessage = "Copied GitHub code ${pendingSignIn?.userCode.orEmpty()}." },
                     onLoadRepositories = { loadRepositories("") },
+                    onLoadMoreRepositories = loadMoreRepositories,
                     onSaveRepo = { repoUrl, branch ->
                         val parsed = RepoUrlParser.parse(repoUrl, branch)
                         if (parsed.isFailure) {
@@ -528,6 +557,7 @@ private fun GitpullApp(activity: ComponentActivity) {
                         config = next
                         settingsRepository.save(next)
                         repoBrowserItems = emptyList()
+                        repoBrowserNextPage = null
                         repoBrowserMessage = "Signed out of GitHub."
                     },
                     onClearSnapshot = { confirmClear = true }
@@ -616,6 +646,7 @@ private fun SetupScreen(
     repoBrowserLoading: Boolean,
     repoBrowserMessage: String?,
     repoBrowserItems: List<GitHubRepository>,
+    repoBrowserCanLoadMore: Boolean,
     tokenConfigured: Boolean,
     oauthConfigured: Boolean,
     oauthLoading: Boolean,
@@ -625,6 +656,7 @@ private fun SetupScreen(
     onCopyGitHubCode: () -> Unit,
     onSignOut: () -> Unit,
     onLoadRepositories: (String) -> Unit,
+    onLoadMoreRepositories: () -> Unit,
     onSave: (String, String, String) -> Unit
 ) {
     var repoUrl by remember { mutableStateOf(initialConfig.repoUrl) }
@@ -679,7 +711,9 @@ private fun SetupScreen(
                 loading = repoBrowserLoading,
                 message = repoBrowserMessage,
                 repositories = repoBrowserItems,
+                canLoadMore = repoBrowserCanLoadMore,
                 onLoad = { onLoadRepositories(token) },
+                onLoadMore = onLoadMoreRepositories,
                 onSelect = { repo ->
                     repoUrl = repo.htmlUrl
                     branch = repo.defaultBranch
@@ -794,6 +828,7 @@ private fun SettingsScreen(
     repoBrowserLoading: Boolean,
     repoBrowserMessage: String?,
     repoBrowserItems: List<GitHubRepository>,
+    repoBrowserCanLoadMore: Boolean,
     tokenConfigured: Boolean,
     oauthConfigured: Boolean,
     oauthLoading: Boolean,
@@ -802,6 +837,7 @@ private fun SettingsScreen(
     onCheckGitHubSignIn: () -> Unit,
     onCopyGitHubCode: () -> Unit,
     onLoadRepositories: () -> Unit,
+    onLoadMoreRepositories: () -> Unit,
     onSaveRepo: (String, String) -> Unit,
     onSaveToken: (String) -> Unit,
     onSignOut: () -> Unit,
@@ -845,7 +881,9 @@ private fun SettingsScreen(
             loading = repoBrowserLoading,
             message = repoBrowserMessage,
             repositories = repoBrowserItems,
+            canLoadMore = repoBrowserCanLoadMore,
             onLoad = onLoadRepositories,
+            onLoadMore = onLoadMoreRepositories,
             onSelect = { repo ->
                 repoUrl = repo.htmlUrl
                 branch = repo.defaultBranch
@@ -1011,7 +1049,9 @@ private fun RepositoryBrowserSection(
     loading: Boolean,
     message: String?,
     repositories: List<GitHubRepository>,
+    canLoadMore: Boolean,
     onLoad: () -> Unit,
+    onLoadMore: () -> Unit,
     onSelect: (GitHubRepository) -> Unit
 ) {
     ComponentCard {
@@ -1019,7 +1059,7 @@ private fun RepositoryBrowserSection(
             Column(Modifier.weight(1f)) {
                 Text("GitHub repositories", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "Load repos available to your GitHub account, then choose the vault repo.",
+                    "Load repos available to your GitHub account, then choose the vault repo. More pages load only when you ask.",
                     color = Tokens.TextMuted,
                     style = MaterialTheme.typography.bodyMedium
                 )
@@ -1040,9 +1080,23 @@ private fun RepositoryBrowserSection(
             Spacer(Modifier.height(8.dp))
             Text(message, color = Tokens.TextMuted, style = MaterialTheme.typography.bodyMedium)
         }
-        repositories.take(20).forEach { repo ->
+        repositories.forEach { repo ->
             Spacer(Modifier.height(10.dp))
             RepositoryRow(repo = repo, onSelect = { onSelect(repo) })
+        }
+        if (canLoadMore) {
+            Spacer(Modifier.height(12.dp))
+            OutlinedButton(
+                onClick = onLoadMore,
+                enabled = !loading,
+                modifier = Modifier.fillMaxWidth().height(48.dp).testTag("load-more-repositories")
+            ) {
+                if (loading) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                } else {
+                    Text("Load more")
+                }
+            }
         }
     }
 }

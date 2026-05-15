@@ -11,15 +11,20 @@ data class GitHubRepository(
     val privateRepo: Boolean
 )
 
+data class GitHubRepositoryPage(
+    val repositories: List<GitHubRepository>,
+    val nextPage: Int?
+)
+
 class GitHubRepositoryClient(
     private val client: OkHttpClient = OkHttpClient(),
     private val apiBaseUrl: String = "https://api.github.com"
 ) {
-    fun request(token: String, page: Int = 1): Request {
+    fun request(token: String, page: Int = 1, perPage: Int = 50): Request {
         require(token.isNotBlank()) { "GitHub token is required to browse repositories" }
         val url = apiBaseUrl.trimEnd('/').toHttpUrl().newBuilder()
             .addPathSegments("user/repos")
-            .addQueryParameter("per_page", "100")
+            .addQueryParameter("per_page", perPage.toString())
             .addQueryParameter("page", page.toString())
             .addQueryParameter("affiliation", "owner,collaborator,organization_member")
             .addQueryParameter("sort", "updated")
@@ -33,18 +38,28 @@ class GitHubRepositoryClient(
             .build()
     }
 
+    fun listRepositoriesPage(token: String, page: Int = 1, perPage: Int = 50): GitHubRepositoryPage {
+        require(page >= 1) { "GitHub repository page must be 1 or greater" }
+        require(perPage in 1..100) { "GitHub repository page size must be between 1 and 100" }
+        val repositories = fetchPage(token, page, perPage)
+        return GitHubRepositoryPage(
+            repositories = repositories,
+            nextPage = if (repositories.size == perPage) page + 1 else null
+        )
+    }
+
     fun listRepositories(token: String): List<GitHubRepository> {
         val all = mutableListOf<GitHubRepository>()
-        for (page in 1..10) {
-            val pageItems = fetchPage(token, page)
+        for (page in 1..100) {
+            val pageItems = fetchPage(token, page, 100)
             all += pageItems
             if (pageItems.size < 100) break
         }
         return all
     }
 
-    private fun fetchPage(token: String, page: Int): List<GitHubRepository> {
-        client.newCall(request(token, page)).execute().use { response ->
+    private fun fetchPage(token: String, page: Int, perPage: Int): List<GitHubRepository> {
+        client.newCall(request(token, page, perPage)).execute().use { response ->
             if (!response.isSuccessful) {
                 throw IllegalStateException("GitHub repository list failed: HTTP ${response.code}")
             }
