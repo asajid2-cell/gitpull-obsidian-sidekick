@@ -19,7 +19,7 @@ $env:GRADLE_OPTS='-Xmx1024m -Dfile.encoding=UTF-8'
 - Connected Android tests: PASS, 8 tests on `Pixel_9_Pro_XL(AVD) - 16`
 - Lint: PASS, 0 errors
 - APK package: `dev.gitpull.app`
-- APK SHA-256: `c17c07a782d78b305b0bfb48b50d2170c8d1c30e080492e69cda89cf06dc15c8`
+- APK SHA-256: `373c197b5ee94995fbedc3ee01b1eace70c523c8e04a96cb8275b9d1e936063e`
 - Live GitHub OAuth Device Flow smoke: PASS, `POST https://github.com/login/device/code` returned a user code and `https://github.com/login/device`.
 - Visual walkthrough: PASS, Pixel 9 Pro XL screenshots captured at 1344x2992 after the Android safe-area fix.
 
@@ -33,7 +33,7 @@ Validation covered:
 - Snapshot refresh and previous-snapshot preservation after failure.
 - PDF indexing and Android open-with handoff.
 - Secure token storage on Android.
-- Setup, Pull, PDFs, Settings, Storage Access Framework folder selection, GitHub sign-in enabled state for the configured build, and touch targets.
+- Setup, Pull, PDFs, Settings, Storage Access Framework folder selection, GitHub sign-in enabled state for the configured build, sign-in resume polling, and touch targets.
 - Live private GitHub fixture validation with a controlled vault fixture.
 - Obsidian Mobile folder-open behavior.
 

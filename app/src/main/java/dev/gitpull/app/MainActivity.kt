@@ -66,6 +66,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -76,14 +77,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.gitpull.app.core.AppConfig
 import dev.gitpull.app.core.GitHubArchiveClient
 import dev.gitpull.app.core.GitHubOAuthClient
@@ -123,6 +129,14 @@ class MainActivity : ComponentActivity() {
 
 private enum class AppTab { Pull, PDFs, Settings }
 private enum class PullStatus { Idle, Pulling, Success, Error, MissingPermission, Offline }
+
+private data class PendingGitHubSignIn(
+    val deviceCode: String,
+    val userCode: String,
+    val verificationUri: String,
+    val expiresAtMillis: Long,
+    val intervalSeconds: Int
+)
 
 private object Tokens {
     val TextPrimary = Color(0xFF111827)
@@ -171,6 +185,7 @@ private fun GitpullApp(activity: ComponentActivity) {
     val pdfIndexer = remember { AndroidPdfIndexer(activity) }
     val manifestBuilder = remember { AndroidSnapshotManifestBuilder(activity) }
     val scope = rememberCoroutineScope()
+    val lifecycleOwner = LocalLifecycleOwner.current
 
     var config by remember { mutableStateOf(settingsRepository.load()) }
     var tab by remember { mutableStateOf(AppTab.Pull) }
@@ -186,9 +201,72 @@ private fun GitpullApp(activity: ComponentActivity) {
     var repoBrowserMessage by remember { mutableStateOf<String?>(null) }
     var repoBrowserItems by remember { mutableStateOf(emptyList<GitHubRepository>()) }
     var oauthLoading by remember { mutableStateOf(false) }
+    var pendingSignIn by remember { mutableStateOf<PendingGitHubSignIn?>(null) }
+    var signInPollRequest by remember { mutableStateOf(0) }
 
     LaunchedEffect(config.destinationTreeUri) {
         pdfs = pdfIndexer.indexTree(config.destinationTreeUri)
+    }
+
+    DisposableEffect(lifecycleOwner, pendingSignIn?.deviceCode) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME && pendingSignIn != null) {
+                signInPollRequest += 1
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    LaunchedEffect(pendingSignIn?.deviceCode, signInPollRequest) {
+        val pending = pendingSignIn ?: return@LaunchedEffect
+        if (System.currentTimeMillis() >= pending.expiresAtMillis) {
+            pendingSignIn = null
+            oauthLoading = false
+            dialogMessage = "GitHub sign-in expired. Try again."
+            return@LaunchedEffect
+        }
+
+        var intervalSeconds = pending.intervalSeconds.coerceAtLeast(5)
+        if (signInPollRequest == 0) {
+            delay(intervalSeconds * 1000L)
+        }
+
+        while (pendingSignIn?.deviceCode == pending.deviceCode && System.currentTimeMillis() < pending.expiresAtMillis) {
+            oauthLoading = true
+            val pollResult = withContext(Dispatchers.IO) {
+                runCatching { oauthClient.pollDeviceCode(pending.deviceCode) }
+            }
+            oauthLoading = false
+
+            pollResult.onSuccess { token ->
+                tokenStore.save(token)
+                val next = config.copy(tokenConfigured = true)
+                config = next
+                settingsRepository.save(next)
+                pendingSignIn = null
+                repoBrowserMessage = "Signed in with GitHub."
+                return@LaunchedEffect
+            }
+
+            val error = pollResult.exceptionOrNull()
+            if (error is GitHubOAuthClient.AuthorizationPendingException) {
+                if (error.message == "slow_down") intervalSeconds += 5
+                repoBrowserMessage = "Waiting for GitHub approval. Return here after approving access."
+            } else {
+                pendingSignIn = null
+                dialogMessage = error?.message ?: "GitHub sign-in failed."
+                return@LaunchedEffect
+            }
+
+            delay(intervalSeconds * 1000L)
+        }
+
+        if (pendingSignIn?.deviceCode == pending.deviceCode) {
+            pendingSignIn = null
+            oauthLoading = false
+            dialogMessage = "GitHub sign-in expired. Try again."
+        }
     }
 
     val startGitHubSignIn: () -> Unit = {
@@ -202,39 +280,20 @@ private fun GitpullApp(activity: ComponentActivity) {
                     runCatching { oauthClient.requestDeviceCode() }
                 }
                 deviceResult.onSuccess { device ->
-                    repoBrowserMessage = "Enter ${device.userCode} in the GitHub browser window, then return here."
+                    pendingSignIn = PendingGitHubSignIn(
+                        deviceCode = device.deviceCode,
+                        userCode = device.userCode,
+                        verificationUri = device.verificationUri,
+                        expiresAtMillis = System.currentTimeMillis() + device.expiresInSeconds * 1000L,
+                        intervalSeconds = device.intervalSeconds
+                    )
+                    signInPollRequest += 1
+                    repoBrowserMessage = "Enter ${device.userCode} in GitHub, then return here."
                     try {
                         activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(device.verificationUri)))
                     } catch (_: ActivityNotFoundException) {
                         dialogMessage = "Open ${device.verificationUri} and enter ${device.userCode}."
                     }
-
-                    val expiresAtMillis = System.currentTimeMillis() + device.expiresInSeconds * 1000L
-                    var intervalSeconds = device.intervalSeconds.coerceAtLeast(5)
-                    while (System.currentTimeMillis() < expiresAtMillis) {
-                        delay(intervalSeconds * 1000L)
-                        val pollResult = withContext(Dispatchers.IO) {
-                            runCatching { oauthClient.pollDeviceCode(device.deviceCode) }
-                        }
-                        pollResult.onSuccess { token ->
-                            tokenStore.save(token)
-                            val next = config.copy(tokenConfigured = true)
-                            config = next
-                            settingsRepository.save(next)
-                            repoBrowserMessage = "Signed in with GitHub."
-                            oauthLoading = false
-                            return@launch
-                        }
-                        val error = pollResult.exceptionOrNull()
-                        if (error is GitHubOAuthClient.AuthorizationPendingException) {
-                            if (error.message == "slow_down") intervalSeconds += 5
-                        } else {
-                            dialogMessage = error?.message ?: "GitHub sign-in failed."
-                            oauthLoading = false
-                            return@launch
-                        }
-                    }
-                    dialogMessage = "GitHub sign-in expired. Try again."
                 }.onFailure { error ->
                     dialogMessage = error.message ?: "GitHub sign-in failed."
                 }
@@ -287,9 +346,13 @@ private fun GitpullApp(activity: ComponentActivity) {
             tokenConfigured = config.tokenConfigured,
             oauthConfigured = oauthClient.isConfigured,
             oauthLoading = oauthLoading,
+            pendingSignIn = pendingSignIn,
             onStartGitHubSignIn = startGitHubSignIn,
+            onCheckGitHubSignIn = { signInPollRequest += 1 },
+            onCopyGitHubCode = { repoBrowserMessage = "Copied GitHub code ${pendingSignIn?.userCode.orEmpty()}." },
             onSignOut = {
                 tokenStore.clear()
+                pendingSignIn = null
                 val next = config.copy(tokenConfigured = false)
                 config = next
                 settingsRepository.save(next)
@@ -430,7 +493,10 @@ private fun GitpullApp(activity: ComponentActivity) {
                     tokenConfigured = config.tokenConfigured,
                     oauthConfigured = oauthClient.isConfigured,
                     oauthLoading = oauthLoading,
+                    pendingSignIn = pendingSignIn,
                     onStartGitHubSignIn = startGitHubSignIn,
+                    onCheckGitHubSignIn = { signInPollRequest += 1 },
+                    onCopyGitHubCode = { repoBrowserMessage = "Copied GitHub code ${pendingSignIn?.userCode.orEmpty()}." },
                     onLoadRepositories = { loadRepositories("") },
                     onSaveRepo = { repoUrl, branch ->
                         val parsed = RepoUrlParser.parse(repoUrl, branch)
@@ -457,6 +523,7 @@ private fun GitpullApp(activity: ComponentActivity) {
                     },
                     onSignOut = {
                         tokenStore.clear()
+                        pendingSignIn = null
                         val next = config.copy(tokenConfigured = false)
                         config = next
                         settingsRepository.save(next)
@@ -552,7 +619,10 @@ private fun SetupScreen(
     tokenConfigured: Boolean,
     oauthConfigured: Boolean,
     oauthLoading: Boolean,
+    pendingSignIn: PendingGitHubSignIn?,
     onStartGitHubSignIn: () -> Unit,
+    onCheckGitHubSignIn: () -> Unit,
+    onCopyGitHubCode: () -> Unit,
     onSignOut: () -> Unit,
     onLoadRepositories: (String) -> Unit,
     onSave: (String, String, String) -> Unit
@@ -592,7 +662,10 @@ private fun SetupScreen(
                 tokenConfigured = tokenConfigured,
                 oauthConfigured = oauthConfigured,
                 oauthLoading = oauthLoading,
+                pendingSignIn = pendingSignIn,
                 onStartGitHubSignIn = onStartGitHubSignIn,
+                onCheckGitHubSignIn = onCheckGitHubSignIn,
+                onCopyGitHubCode = onCopyGitHubCode,
                 onSignOut = onSignOut
             )
             OutlinedTextField(
@@ -724,7 +797,10 @@ private fun SettingsScreen(
     tokenConfigured: Boolean,
     oauthConfigured: Boolean,
     oauthLoading: Boolean,
+    pendingSignIn: PendingGitHubSignIn?,
     onStartGitHubSignIn: () -> Unit,
+    onCheckGitHubSignIn: () -> Unit,
+    onCopyGitHubCode: () -> Unit,
     onLoadRepositories: () -> Unit,
     onSaveRepo: (String, String) -> Unit,
     onSaveToken: (String) -> Unit,
@@ -780,7 +856,10 @@ private fun SettingsScreen(
             tokenConfigured = tokenConfigured,
             oauthConfigured = oauthConfigured,
             oauthLoading = oauthLoading,
+            pendingSignIn = pendingSignIn,
             onStartGitHubSignIn = onStartGitHubSignIn,
+            onCheckGitHubSignIn = onCheckGitHubSignIn,
+            onCopyGitHubCode = onCopyGitHubCode,
             onSignOut = onSignOut
         )
         ComponentCard {
@@ -824,9 +903,13 @@ private fun GitHubAuthCard(
     tokenConfigured: Boolean,
     oauthConfigured: Boolean,
     oauthLoading: Boolean,
+    pendingSignIn: PendingGitHubSignIn?,
     onStartGitHubSignIn: () -> Unit,
+    onCheckGitHubSignIn: () -> Unit,
+    onCopyGitHubCode: () -> Unit,
     onSignOut: () -> Unit
 ) {
+    val clipboard = LocalClipboardManager.current
     ComponentCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.AccountCircle, contentDescription = null, tint = Tokens.Accent)
@@ -866,6 +949,57 @@ private fun GitHubAuthCard(
             if (tokenConfigured) {
                 OutlinedButton(onClick = onSignOut, modifier = Modifier.height(48.dp).testTag("github-sign-out")) {
                     Text("Sign out")
+                }
+            }
+        }
+        if (pendingSignIn != null) {
+            Spacer(Modifier.height(12.dp))
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Tokens.AccentSoft),
+                border = BorderStroke(1.dp, Tokens.Line),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.fillMaxWidth().testTag("github-device-code-card")
+            ) {
+                Column(Modifier.padding(12.dp)) {
+                    Text("GitHub code", style = MaterialTheme.typography.labelSmall, color = Tokens.TextMuted)
+                    Text(
+                        pendingSignIn.userCode,
+                        color = Tokens.TextPrimary,
+                        fontSize = 24.sp,
+                        lineHeight = 30.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.testTag("github-device-code")
+                    )
+                    Text(
+                        pendingSignIn.verificationUri,
+                        color = Tokens.TextMuted,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = {
+                                clipboard.setText(AnnotatedString(pendingSignIn.userCode))
+                                onCopyGitHubCode()
+                            },
+                            modifier = Modifier.height(48.dp).testTag("copy-github-code")
+                        ) {
+                            Text("Copy code")
+                        }
+                        Button(
+                            onClick = onCheckGitHubSignIn,
+                            enabled = !oauthLoading,
+                            modifier = Modifier.height(48.dp).testTag("check-github-sign-in")
+                        ) {
+                            if (oauthLoading) {
+                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                            } else {
+                                Text("Check sign-in")
+                            }
+                        }
+                    }
                 }
             }
         }

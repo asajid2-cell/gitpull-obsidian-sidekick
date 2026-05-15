@@ -25,7 +25,7 @@ app\build\outputs\apk\debug\app-debug.apk
 Latest audited APK SHA-256:
 
 ```text
-c17c07a782d78b305b0bfb48b50d2170c8d1c30e080492e69cda89cf06dc15c8
+373c197b5ee94995fbedc3ee01b1eace70c523c8e04a96cb8275b9d1e936063e
 ```
 
 ## Test
