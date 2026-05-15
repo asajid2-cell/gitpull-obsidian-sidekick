@@ -93,8 +93,10 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.gitpull.app.core.AppConfig
 import dev.gitpull.app.core.GitHubArchiveClient
 import dev.gitpull.app.core.GitHubOAuthClient
+import dev.gitpull.app.core.GitHubOAuthGateway
 import dev.gitpull.app.core.GitHubRepository
 import dev.gitpull.app.core.GitHubRepositoryClient
+import dev.gitpull.app.core.GitHubRepositoryGateway
 import dev.gitpull.app.core.PendingGitHubSignIn
 import dev.gitpull.app.core.PdfItem
 import dev.gitpull.app.core.PullConfig
@@ -126,6 +128,16 @@ class MainActivity : ComponentActivity() {
                 GitpullApp(activity = this)
             }
         }
+    }
+}
+
+internal object GitpullAppHooks {
+    var oauthClientFactory: (() -> GitHubOAuthGateway)? = null
+    var repositoryClientFactory: (() -> GitHubRepositoryGateway)? = null
+
+    fun reset() {
+        oauthClientFactory = null
+        repositoryClientFactory = null
     }
 }
 
@@ -176,7 +188,8 @@ private fun GitpullApp(activity: ComponentActivity) {
     val settingsRepository = remember { AndroidSettingsRepository(activity) }
     val tokenStore = remember { SecureTokenStore(activity) }
     val signInStore = remember { GitHubDeviceSignInStore(activity) }
-    val oauthClient = remember { GitHubOAuthClient(BuildConfig.GITHUB_OAUTH_CLIENT_ID) }
+    val oauthClient = remember { GitpullAppHooks.oauthClientFactory?.invoke() ?: GitHubOAuthClient(BuildConfig.GITHUB_OAUTH_CLIENT_ID) }
+    val repositoryClient = remember { GitpullAppHooks.repositoryClientFactory?.invoke() ?: GitHubRepositoryClient() }
     val pdfIndexer = remember { AndroidPdfIndexer(activity) }
     val manifestBuilder = remember { AndroidSnapshotManifestBuilder(activity) }
     val scope = rememberCoroutineScope()
@@ -200,24 +213,24 @@ private fun GitpullApp(activity: ComponentActivity) {
     var pendingSignIn by remember { mutableStateOf(signInStore.load()) }
     var signInPollRequest by remember { mutableStateOf(0) }
 
-    val loadRepositoryPage: (String, Int, Boolean) -> Unit = { token, page, append ->
+    val loadRepositoryPage: (String, Int, Boolean, String) -> Unit = { token, page, append, messagePrefix ->
         scope.launch {
             repoBrowserLoading = true
-            repoBrowserMessage = if (append) "Loading more repositories..." else "Loading repositories..."
+            repoBrowserMessage = if (append) "Loading more repositories..." else "${messagePrefix}Loading repositories..."
             val result = withContext(Dispatchers.IO) {
-                runCatching { GitHubRepositoryClient().listRepositoriesPage(token, page) }
+                runCatching { repositoryClient.listRepositoriesPage(token, page) }
             }
             result.onSuccess { repoPage ->
                 val nextItems = if (append) repoBrowserItems + repoPage.repositories else repoPage.repositories
                 repoBrowserItems = nextItems
                 repoBrowserNextPage = repoPage.nextPage
                 repoBrowserMessage = if (nextItems.isEmpty()) {
-                    "No repositories were returned for this GitHub account."
+                    "${messagePrefix}No repositories were returned for this GitHub account."
                 } else {
-                    "Loaded ${nextItems.size} repositories."
+                    "${messagePrefix}Loaded ${nextItems.size} repositories."
                 }
             }.onFailure { error ->
-                repoBrowserMessage = "Could not load repositories. ${error.message.orEmpty()}"
+                repoBrowserMessage = "${messagePrefix}Could not load repositories. ${error.message.orEmpty()}"
             }
             repoBrowserLoading = false
         }
@@ -267,7 +280,7 @@ private fun GitpullApp(activity: ComponentActivity) {
                 signInStore.clear()
                 pendingSignIn = null
                 repoBrowserMessage = "Signed in with GitHub."
-                loadRepositoryPage(token, 1, false)
+                loadRepositoryPage(token, 1, false, "Signed in with GitHub. ")
                 return@LaunchedEffect
             }
 
@@ -310,7 +323,7 @@ private fun GitpullApp(activity: ComponentActivity) {
                 oauthLoading = true
                 repoBrowserMessage = "Starting GitHub sign-in..."
                 val deviceResult = withContext(Dispatchers.IO) {
-                    runCatching { oauthClient.requestDeviceCode() }
+                    runCatching { oauthClient.requestDeviceCode("repo") }
                 }
                 deviceResult.onSuccess { device ->
                     val pending = PendingGitHubSignIn(
@@ -353,7 +366,7 @@ private fun GitpullApp(activity: ComponentActivity) {
         if (token.isBlank()) {
             repoBrowserMessage = "Sign in with GitHub before loading repositories."
         } else {
-            loadRepositoryPage(token, 1, false)
+            loadRepositoryPage(token, 1, false, "")
         }
     }
 
@@ -365,7 +378,7 @@ private fun GitpullApp(activity: ComponentActivity) {
         } else if (nextPage == null) {
             repoBrowserMessage = "All loaded repositories are already shown."
         } else {
-            loadRepositoryPage(token, nextPage, true)
+            loadRepositoryPage(token, nextPage, true, "")
         }
     }
 

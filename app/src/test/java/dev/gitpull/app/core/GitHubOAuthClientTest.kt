@@ -13,7 +13,7 @@ class GitHubOAuthClientTest {
             server.enqueue(MockResponse().setResponseCode(200).setBody("""{"device_code":"device-123","user_code":"ABCD-1234","verification_uri":"https://github.com/login/device","expires_in":900,"interval":5}"""))
             val client = GitHubOAuthClient(clientId = "client-id", githubBaseUrl = server.url("/").toString())
 
-            val code = client.requestDeviceCode()
+            val code = client.requestDeviceCode("repo")
 
             assertEquals("device-123", code.deviceCode)
             assertEquals("ABCD-1234", code.userCode)

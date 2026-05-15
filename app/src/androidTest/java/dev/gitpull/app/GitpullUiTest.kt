@@ -9,6 +9,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -20,12 +21,21 @@ import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 import dev.gitpull.app.core.PendingGitHubSignIn
+import dev.gitpull.app.core.GitHubDeviceCode
+import dev.gitpull.app.core.GitHubOAuthClient
+import dev.gitpull.app.core.GitHubOAuthGateway
+import dev.gitpull.app.core.GitHubRepository
+import dev.gitpull.app.core.GitHubRepositoryGateway
+import dev.gitpull.app.core.GitHubRepositoryPage
 import dev.gitpull.app.data.GitHubDeviceSignInStore
+import dev.gitpull.app.data.SecureTokenStore
 import org.junit.Assert.assertTrue
+import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
 
 class GitpullUiTest {
     @get:Rule
@@ -33,6 +43,7 @@ class GitpullUiTest {
 
     @Before
     fun resetAppState() {
+        GitpullAppHooks.reset()
         composeRule.activity
             .getSharedPreferences("gitpull_settings", Context.MODE_PRIVATE)
             .edit()
@@ -43,8 +54,14 @@ class GitpullUiTest {
             .edit()
             .clear()
             .commit()
+        SecureTokenStore(composeRule.activity).clear()
         composeRule.activityRule.scenario.recreate()
         composeRule.waitForIdle()
+    }
+
+    @After
+    fun resetHooks() {
+        GitpullAppHooks.reset()
     }
 
     @Test
@@ -117,6 +134,46 @@ class GitpullUiTest {
         composeRule.onNodeWithTag("check-github-sign-in")
             .assertIsDisplayed()
             .assertIsEnabled()
+    }
+
+    @Test
+    fun approvedGithubDeviceFlowSignsInAndLoadsRepositories() {
+        val oauth = FakeApprovedOAuthGateway()
+        GitpullAppHooks.oauthClientFactory = { oauth }
+        GitpullAppHooks.repositoryClientFactory = { FakeRepositoryGateway() }
+        composeRule.activityRule.scenario.recreate()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("github-sign-in")
+            .performScrollTo()
+            .performClick()
+
+        composeRule.waitUntil(timeoutMillis = 10_000) { oauth.pollCount.get() >= 1 }
+        if (composeRule.onAllNodesWithTag("github-device-code").fetchSemanticsNodes().isNotEmpty()) {
+            composeRule.onNodeWithTag("github-device-code")
+                .performScrollTo()
+                .assertTextContains("TEST-1234")
+                .assertIsDisplayed()
+            composeRule.onNodeWithTag("check-github-sign-in")
+                .assertIsDisplayed()
+                .assertIsEnabled()
+                .performClick()
+        }
+
+        composeRule.waitUntil(timeoutMillis = 10_000) { oauth.pollCount.get() >= 2 }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText("Signed in. Repository browsing and private pulls can use your GitHub account.")
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Signed in with GitHub. Loaded 1 repositories.")
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("owner/vault")
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("github-sign-out")
+            .assertIsDisplayed()
     }
 
     @Test
@@ -253,5 +310,44 @@ class GitpullUiTest {
 
     private fun isObsidianLaunchAvailable(): Boolean {
         return composeRule.activity.packageManager.getLaunchIntentForPackage("md.obsidian") != null
+    }
+
+    private class FakeApprovedOAuthGateway : GitHubOAuthGateway {
+        val pollCount = AtomicInteger(0)
+        override val isConfigured: Boolean = true
+
+        override fun requestDeviceCode(scope: String): GitHubDeviceCode {
+            return GitHubDeviceCode(
+                deviceCode = "device-test",
+                userCode = "TEST-1234",
+                verificationUri = "gitpull-device-test://authorize",
+                expiresInSeconds = 900,
+                intervalSeconds = 30
+            )
+        }
+
+        override fun pollDeviceCode(deviceCode: String): String {
+            return if (pollCount.incrementAndGet() == 1) {
+                throw GitHubOAuthClient.AuthorizationPendingException("authorization_pending")
+            } else {
+                "oauth-token"
+            }
+        }
+    }
+
+    private class FakeRepositoryGateway : GitHubRepositoryGateway {
+        override fun listRepositoriesPage(token: String, page: Int, perPage: Int): GitHubRepositoryPage {
+            return GitHubRepositoryPage(
+                repositories = listOf(
+                    GitHubRepository(
+                        fullName = "owner/vault",
+                        htmlUrl = "https://github.com/owner/vault",
+                        defaultBranch = "main",
+                        privateRepo = true
+                    )
+                ),
+                nextPage = null
+            )
+        }
     }
 }

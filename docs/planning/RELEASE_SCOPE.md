@@ -7,6 +7,7 @@
 - Manual repository URL entry.
 - Browser GitHub sign-in through GitHub OAuth Device Flow.
 - Persisted in-progress GitHub approval sessions when returning from the browser.
+- Clear signed-in state and repository-load messaging after approval completes.
 - GitHub token fallback for builds or users that do not use browser sign-in.
 - Authenticated repository browsing.
 - Pull-only archive download from GitHub.

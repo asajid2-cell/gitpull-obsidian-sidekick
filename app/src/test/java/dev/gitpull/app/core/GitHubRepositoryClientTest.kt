@@ -83,7 +83,7 @@ class GitHubRepositoryClientTest {
             server.start()
 
             val page = GitHubRepositoryClient(apiBaseUrl = server.url("/").toString())
-                .listRepositoriesPage("secret-token")
+                .listRepositoriesPage("secret-token", page = 1, perPage = 50)
 
             val request = server.takeRequest()
             assertEquals("/user/repos?per_page=50&page=1&affiliation=owner%2Ccollaborator%2Corganization_member&sort=updated", request.path)
@@ -117,7 +117,7 @@ class GitHubRepositoryClientTest {
             server.start()
 
             val page = GitHubRepositoryClient(apiBaseUrl = server.url("/").toString())
-                .listRepositoriesPage("secret-token")
+                .listRepositoriesPage("secret-token", page = 1, perPage = 50)
 
             assertEquals(50, page.repositories.size)
             assertEquals("owner/repo-0", page.repositories.first().fullName)

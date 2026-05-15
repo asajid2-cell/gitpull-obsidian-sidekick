@@ -13,14 +13,20 @@ data class GitHubDeviceCode(
     val intervalSeconds: Int
 )
 
+interface GitHubOAuthGateway {
+    val isConfigured: Boolean
+    fun requestDeviceCode(scope: String = "repo"): GitHubDeviceCode
+    fun pollDeviceCode(deviceCode: String): String
+}
+
 class GitHubOAuthClient(
     private val clientId: String,
     private val client: OkHttpClient = OkHttpClient(),
     private val githubBaseUrl: String = "https://github.com"
-) {
-    val isConfigured: Boolean get() = clientId.isNotBlank()
+) : GitHubOAuthGateway {
+    override val isConfigured: Boolean get() = clientId.isNotBlank()
 
-    fun requestDeviceCode(scope: String = "repo"): GitHubDeviceCode {
+    override fun requestDeviceCode(scope: String): GitHubDeviceCode {
         require(isConfigured) { "GitHub browser login is not configured for this build" }
         val body = FormBody.Builder()
             .add("client_id", clientId)
@@ -49,7 +55,7 @@ class GitHubOAuthClient(
         }
     }
 
-    fun pollDeviceCode(deviceCode: String): String {
+    override fun pollDeviceCode(deviceCode: String): String {
         require(isConfigured) { "GitHub browser login is not configured for this build" }
         require(deviceCode.isNotBlank()) { "GitHub login did not return a device code" }
 
@@ -73,13 +79,16 @@ class GitHubOAuthClient(
             val error = stringField(text, "error")
             if (error == "authorization_pending" || error == "slow_down") throw AuthorizationPendingException(error)
             val description = stringField(text, "error_description")
-            if (!error.isNullOrBlank()) throw IllegalStateException(description ?: error)
+            if (!error.isNullOrBlank()) throw OAuthException(error, description)
             return stringField(text, "access_token")
                 ?: throw IllegalStateException("GitHub login did not return an access token")
         }
     }
 
     class AuthorizationPendingException(message: String) : RuntimeException(message)
+    class OAuthException(val code: String, description: String?) : RuntimeException(
+        listOfNotNull(code, description).joinToString(": ")
+    )
 
     companion object {
         private fun stringField(jsonObject: String, name: String): String? {

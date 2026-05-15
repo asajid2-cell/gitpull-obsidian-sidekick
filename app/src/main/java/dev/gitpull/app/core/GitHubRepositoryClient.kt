@@ -16,10 +16,14 @@ data class GitHubRepositoryPage(
     val nextPage: Int?
 )
 
+interface GitHubRepositoryGateway {
+    fun listRepositoriesPage(token: String, page: Int = 1, perPage: Int = 50): GitHubRepositoryPage
+}
+
 class GitHubRepositoryClient(
     private val client: OkHttpClient = OkHttpClient(),
     private val apiBaseUrl: String = "https://api.github.com"
-) {
+) : GitHubRepositoryGateway {
     fun request(token: String, page: Int = 1, perPage: Int = 50): Request {
         require(token.isNotBlank()) { "GitHub token is required to browse repositories" }
         val url = apiBaseUrl.trimEnd('/').toHttpUrl().newBuilder()
@@ -38,7 +42,7 @@ class GitHubRepositoryClient(
             .build()
     }
 
-    fun listRepositoriesPage(token: String, page: Int = 1, perPage: Int = 50): GitHubRepositoryPage {
+    override fun listRepositoriesPage(token: String, page: Int, perPage: Int): GitHubRepositoryPage {
         require(page >= 1) { "GitHub repository page must be 1 or greater" }
         require(perPage in 1..100) { "GitHub repository page size must be between 1 and 100" }
         val repositories = fetchPage(token, page, perPage)
