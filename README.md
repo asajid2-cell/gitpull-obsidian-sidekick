@@ -15,15 +15,15 @@ This is a debug-signed APK for sideload testing. It is not a Play Store release 
 Verify the APK before installing:
 
 ```text
-c59e647158a1f87bc18eab8ebdd9098f1a430e37c6b118576b2ba976e1816a8f  apk/gitpull-debug.apk
+396e6de68ef0a5043cacd8637b0f8365a2e50e1e8f370e0901f2c79018e39e65  apk/gitpull-debug.apk
 ```
 
-The included APK has browser GitHub sign-in enabled through the app's public OAuth client ID. In-progress GitHub approval sessions are kept when you return from the browser. The token fallback is still available.
+The included APK has browser GitHub sign-in enabled through the app's public OAuth client ID. In-progress GitHub approval sessions are kept when you return from the browser, and the app keeps sign-in success visible even if repository loading has a separate failure. The token fallback is still available.
 
 ## What It Does
 
 - Browse GitHub repositories after browser sign-in, or with the token fallback, one page at a time.
-- Copy the GitHub device code, keep the same login session active after returning from GitHub, and re-check sign-in without starting over.
+- Copy the GitHub device code, keep the same login session active after returning from GitHub, complete sign-in without starting over, and then load repositories.
 - Use the Branch Drop launcher logo.
 - Pull a selected repository branch into an Android folder.
 - Preserve the previous usable snapshot if a pull fails.
@@ -57,7 +57,7 @@ Latest release validation:
 assembleDebug testDebugUnitTest lintDebug connectedDebugAndroidTest
 PASS
 Unit tests: 26 tests, 0 failures, 1 gated live test skipped without token
-Connected Android tests: 9 tests, 0 failures
+Connected Android tests: 10 tests, 0 failures
 Lint: 0 errors
 Visual walkthrough: Pixel 9 Pro XL emulator at 1344x2992
 ```

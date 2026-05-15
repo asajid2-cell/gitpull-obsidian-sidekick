@@ -1,1 +1,1 @@
-c59e647158a1f87bc18eab8ebdd9098f1a430e37c6b118576b2ba976e1816a8f  apk/gitpull-debug.apk
+396e6de68ef0a5043cacd8637b0f8365a2e50e1e8f370e0901f2c79018e39e65  apk/gitpull-debug.apk
