@@ -25,7 +25,7 @@ app\build\outputs\apk\debug\app-debug.apk
 Latest audited APK SHA-256:
 
 ```text
-1564e001240a4073ebc1b713d57ce1c0326e1abee618d8a82882be8c3c76908d
+c59e647158a1f87bc18eab8ebdd9098f1a430e37c6b118576b2ba976e1816a8f
 ```
 
 ## Test
@@ -51,7 +51,7 @@ Pixel 9 Pro XL walkthrough screenshots are in `docs/assets/screenshots/`, with t
 
 ## Current Validation State
 
-The app builds, installs, passes unit/instrumentation/lint validation, supports browser GitHub sign-in through GitHub's device flow, keeps a token fallback, loads GitHub repositories one page at a time, pulls public GitHub snapshots, refreshes SAF-selected folders, indexes PDFs, opens pulled folders in Obsidian Mobile, and has live private GitHub fixture validation for Markdown, `.obsidian`, image, and PDF assets.
+The app builds, installs, passes unit/instrumentation/lint validation, supports browser GitHub sign-in through GitHub's device flow, keeps in-progress GitHub approval sessions after returning from the browser, keeps a token fallback, loads GitHub repositories one page at a time, pulls public GitHub snapshots, refreshes SAF-selected folders, indexes PDFs, opens pulled folders in Obsidian Mobile, and has live private GitHub fixture validation for Markdown, `.obsidian`, image, and PDF assets.
 
 Live private GitHub validation used a controlled fixture repository containing Markdown, `.obsidian`, image, and PDF assets. The exact private fixture identity is not required for normal use.
 

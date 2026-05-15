@@ -19,6 +19,8 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
+import dev.gitpull.app.core.PendingGitHubSignIn
+import dev.gitpull.app.data.GitHubDeviceSignInStore
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -33,6 +35,11 @@ class GitpullUiTest {
     fun resetAppState() {
         composeRule.activity
             .getSharedPreferences("gitpull_settings", Context.MODE_PRIVATE)
+            .edit()
+            .clear()
+            .commit()
+        composeRule.activity
+            .getSharedPreferences("gitpull_github_device_sign_in", Context.MODE_PRIVATE)
             .edit()
             .clear()
             .commit()
@@ -81,6 +88,35 @@ class GitpullUiTest {
                 .assertIsDisplayed()
                 .assertIsEnabled()
         }
+    }
+
+    @Test
+    fun pendingGithubSignInSurvivesActivityRecreate() {
+        GitHubDeviceSignInStore(composeRule.activity).save(
+            PendingGitHubSignIn(
+                deviceCode = "device-test",
+                userCode = "ABCD-1234",
+                verificationUri = "https://github.com/login/device",
+                expiresAtMillis = System.currentTimeMillis() + 900_000L,
+                intervalSeconds = 30
+            )
+        )
+
+        composeRule.activityRule.scenario.recreate()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("github-device-code-card")
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("github-device-code")
+            .assertTextContains("ABCD-1234")
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("copy-github-code")
+            .assertIsDisplayed()
+            .assertIsEnabled()
+        composeRule.onNodeWithTag("check-github-sign-in")
+            .assertIsDisplayed()
+            .assertIsEnabled()
     }
 
     @Test

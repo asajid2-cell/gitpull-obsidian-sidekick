@@ -95,6 +95,7 @@ import dev.gitpull.app.core.GitHubArchiveClient
 import dev.gitpull.app.core.GitHubOAuthClient
 import dev.gitpull.app.core.GitHubRepository
 import dev.gitpull.app.core.GitHubRepositoryClient
+import dev.gitpull.app.core.PendingGitHubSignIn
 import dev.gitpull.app.core.PdfItem
 import dev.gitpull.app.core.PullConfig
 import dev.gitpull.app.core.PullService
@@ -107,6 +108,7 @@ import dev.gitpull.app.data.AndroidSnapshotManifestBuilder
 import dev.gitpull.app.data.AndroidSettingsRepository
 import dev.gitpull.app.data.AndroidSnapshotTools
 import dev.gitpull.app.data.ContentResolverSnapshotWriter
+import dev.gitpull.app.data.GitHubDeviceSignInStore
 import dev.gitpull.app.data.SecureTokenStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -129,14 +131,6 @@ class MainActivity : ComponentActivity() {
 
 private enum class AppTab { Pull, PDFs, Settings }
 private enum class PullStatus { Idle, Pulling, Success, Error, MissingPermission, Offline }
-
-private data class PendingGitHubSignIn(
-    val deviceCode: String,
-    val userCode: String,
-    val verificationUri: String,
-    val expiresAtMillis: Long,
-    val intervalSeconds: Int
-)
 
 private object Tokens {
     val TextPrimary = Color(0xFF111827)
@@ -181,6 +175,7 @@ private fun GitpullTheme(content: @Composable () -> Unit) {
 private fun GitpullApp(activity: ComponentActivity) {
     val settingsRepository = remember { AndroidSettingsRepository(activity) }
     val tokenStore = remember { SecureTokenStore(activity) }
+    val signInStore = remember { GitHubDeviceSignInStore(activity) }
     val oauthClient = remember { GitHubOAuthClient(BuildConfig.GITHUB_OAUTH_CLIENT_ID) }
     val pdfIndexer = remember { AndroidPdfIndexer(activity) }
     val manifestBuilder = remember { AndroidSnapshotManifestBuilder(activity) }
@@ -202,7 +197,7 @@ private fun GitpullApp(activity: ComponentActivity) {
     var repoBrowserItems by remember { mutableStateOf(emptyList<GitHubRepository>()) }
     var repoBrowserNextPage by remember { mutableStateOf<Int?>(null) }
     var oauthLoading by remember { mutableStateOf(false) }
-    var pendingSignIn by remember { mutableStateOf<PendingGitHubSignIn?>(null) }
+    var pendingSignIn by remember { mutableStateOf(signInStore.load()) }
     var signInPollRequest by remember { mutableStateOf(0) }
 
     val loadRepositoryPage: (String, Int, Boolean) -> Unit = { token, page, append ->
@@ -245,6 +240,7 @@ private fun GitpullApp(activity: ComponentActivity) {
     LaunchedEffect(pendingSignIn?.deviceCode, signInPollRequest) {
         val pending = pendingSignIn ?: return@LaunchedEffect
         if (System.currentTimeMillis() >= pending.expiresAtMillis) {
+            signInStore.clear()
             pendingSignIn = null
             oauthLoading = false
             dialogMessage = "GitHub sign-in expired. Try again."
@@ -268,6 +264,7 @@ private fun GitpullApp(activity: ComponentActivity) {
                 val next = config.copy(tokenConfigured = true)
                 config = next
                 settingsRepository.save(next)
+                signInStore.clear()
                 pendingSignIn = null
                 repoBrowserMessage = "Signed in with GitHub."
                 loadRepositoryPage(token, 1, false)
@@ -279,6 +276,7 @@ private fun GitpullApp(activity: ComponentActivity) {
                 if (error.message == "slow_down") intervalSeconds += 5
                 repoBrowserMessage = "Waiting for GitHub approval. Return here after approving access."
             } else {
+                signInStore.clear()
                 pendingSignIn = null
                 dialogMessage = error?.message ?: "GitHub sign-in failed."
                 return@LaunchedEffect
@@ -288,6 +286,7 @@ private fun GitpullApp(activity: ComponentActivity) {
         }
 
         if (pendingSignIn?.deviceCode == pending.deviceCode) {
+            signInStore.clear()
             pendingSignIn = null
             oauthLoading = false
             dialogMessage = "GitHub sign-in expired. Try again."
@@ -295,7 +294,16 @@ private fun GitpullApp(activity: ComponentActivity) {
     }
 
     val startGitHubSignIn: () -> Unit = {
-        if (!oauthClient.isConfigured) {
+        val existingPending = pendingSignIn
+        if (existingPending != null) {
+            repoBrowserMessage = "Checking the existing GitHub sign-in session..."
+            signInPollRequest += 1
+            try {
+                activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(existingPending.verificationUri)))
+            } catch (_: ActivityNotFoundException) {
+                dialogMessage = "Open ${existingPending.verificationUri} and enter ${existingPending.userCode}."
+            }
+        } else if (!oauthClient.isConfigured) {
             dialogMessage = "GitHub sign-in needs a GitHub OAuth client ID in this build."
         } else {
             scope.launch {
@@ -305,13 +313,15 @@ private fun GitpullApp(activity: ComponentActivity) {
                     runCatching { oauthClient.requestDeviceCode() }
                 }
                 deviceResult.onSuccess { device ->
-                    pendingSignIn = PendingGitHubSignIn(
+                    val pending = PendingGitHubSignIn(
                         deviceCode = device.deviceCode,
                         userCode = device.userCode,
                         verificationUri = device.verificationUri,
                         expiresAtMillis = System.currentTimeMillis() + device.expiresInSeconds * 1000L,
                         intervalSeconds = device.intervalSeconds
                     )
+                    signInStore.save(pending)
+                    pendingSignIn = pending
                     signInPollRequest += 1
                     repoBrowserMessage = "Enter ${device.userCode} in GitHub, then return here."
                     try {
@@ -377,6 +387,7 @@ private fun GitpullApp(activity: ComponentActivity) {
             onCopyGitHubCode = { repoBrowserMessage = "Copied GitHub code ${pendingSignIn?.userCode.orEmpty()}." },
             onSignOut = {
                 tokenStore.clear()
+                signInStore.clear()
                 pendingSignIn = null
                 val next = config.copy(tokenConfigured = false)
                 config = next
@@ -552,6 +563,7 @@ private fun GitpullApp(activity: ComponentActivity) {
                     },
                     onSignOut = {
                         tokenStore.clear()
+                        signInStore.clear()
                         pendingSignIn = null
                         val next = config.copy(tokenConfigured = false)
                         config = next
@@ -957,6 +969,7 @@ private fun GitHubAuthCard(
                 Text(
                     when {
                         tokenConfigured -> "Signed in. Repository browsing and private pulls can use your GitHub account."
+                        pendingSignIn != null -> "Finish the GitHub browser approval, then return here. This code stays active until it expires."
                         oauthConfigured -> "Use browser sign-in to browse and pull repositories without pasting a token."
                         else -> "Browser sign-in needs a GitHub OAuth client ID in this build."
                     },
@@ -978,6 +991,7 @@ private fun GitHubAuthCard(
                     Text(
                         when {
                             tokenConfigured -> "Sign in again"
+                            pendingSignIn != null -> "Continue sign-in"
                             oauthConfigured -> "Sign in with GitHub"
                             else -> "OAuth client ID needed"
                         }
@@ -1028,7 +1042,7 @@ private fun GitHubAuthCard(
                         }
                         Button(
                             onClick = onCheckGitHubSignIn,
-                            enabled = !oauthLoading,
+                            enabled = true,
                             modifier = Modifier.height(48.dp).testTag("check-github-sign-in")
                         ) {
                             if (oauthLoading) {
