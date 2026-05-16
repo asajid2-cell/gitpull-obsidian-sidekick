@@ -3,7 +3,7 @@
 ## Artifact
 
 - APK: `apk/gitpull-debug.apk`
-- SHA-256: `396e6de68ef0a5043cacd8637b0f8365a2e50e1e8f370e0901f2c79018e39e65`
+- SHA-256: `13d691c49ca48d99c90663a0976df0b80329aeb045fc90b7b346a70535602baf`
 - Android package: `dev.gitpull.app`
 - Minimum Android version: API 26
 
@@ -11,9 +11,9 @@ This is a debug-signed APK produced by the local Android build. It is suitable f
 
 Browser GitHub sign-in is implemented with GitHub OAuth Device Flow and is enabled in this APK with the app's public OAuth client ID. The token fallback remains available.
 
-This build keeps the GitHub device code visible in the app, adds a `Copy code` button, stores the in-progress approval session when you leave for GitHub, re-checks that same session when you return, and keeps the signed-in message visible while repositories load.
+This build keeps the GitHub device code visible in the app, adds a `Copy code` button, stores the in-progress approval session synchronously before leaving for GitHub, re-checks that same session when you return, keeps the pending code active after transient poll failures, and keeps the signed-in message visible while repositories load.
 
-The Android connected test suite now includes an approved GitHub Device Flow simulation that signs in, saves the auth state, and loads a repository list through the real app UI.
+The Android connected test suite includes approved GitHub Device Flow, pending-session restore, committed pending-session restore, and transient poll-failure coverage through the real app UI.
 
 Repository browsing now loads one GitHub page at a time and exposes `Load more` for the next page, so accounts with many repositories do not fetch everything at once.
 

@@ -15,6 +15,7 @@ The app supports:
 - Manual GitHub repository URL entry.
 - Browser GitHub sign-in with the app's public GitHub OAuth client ID.
 - Persisted in-progress GitHub sign-in sessions while the user approves access in the browser.
+- Transient GitHub approval-check failures keep the same pending code active instead of resetting sign-in.
 - Signed-in messaging remains visible while repository loading runs after approval.
 - Authenticated repository browsing with the saved GitHub credential. The browser loads one GitHub API page at a time and uses `Load more` for the next page.
 - A token fallback when browser sign-in is not enabled.
