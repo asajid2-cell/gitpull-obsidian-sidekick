@@ -28,7 +28,7 @@ class AndroidSettingsRepository(context: Context) {
             .putLong(KEY_LAST_PULLED, config.lastPulledAtMillis)
             .putString(KEY_LAST_STATUS, config.lastStatus)
             .putBoolean(KEY_TOKEN_CONFIGURED, config.tokenConfigured)
-            .apply()
+            .commit()
     }
 
     fun clearSnapshotMetadata() {

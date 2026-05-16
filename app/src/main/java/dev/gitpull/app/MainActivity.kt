@@ -117,6 +117,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.IOException
 import java.text.DateFormat
 import java.util.Date
 
@@ -265,8 +266,11 @@ private fun GitpullApp(activity: ComponentActivity) {
             delay(intervalSeconds * 1000L)
         }
 
+        var pollCount = 0
         while (pendingSignIn?.deviceCode == pending.deviceCode && System.currentTimeMillis() < pending.expiresAtMillis) {
+            pollCount += 1
             oauthLoading = true
+            repoBrowserMessage = "Checking GitHub approval for ${pending.userCode}..."
             val pollResult = withContext(Dispatchers.IO) {
                 runCatching { oauthClient.pollDeviceCode(pending.deviceCode) }
             }
@@ -287,12 +291,24 @@ private fun GitpullApp(activity: ComponentActivity) {
             val error = pollResult.exceptionOrNull()
             if (error is GitHubOAuthClient.AuthorizationPendingException) {
                 if (error.message == "slow_down") intervalSeconds += 5
-                repoBrowserMessage = "Waiting for GitHub approval. Return here after approving access."
+                repoBrowserMessage = "Waiting for GitHub approval for ${pending.userCode}. Last check #$pollCount: ${error.message}."
+            } else if (error is GitHubOAuthClient.OAuthException) {
+                val code = error.code
+                val message = "GitHub returned $code. ${error.description.orEmpty()}".trim()
+                if (code in setOf("expired_token", "access_denied", "incorrect_device_code", "incorrect_client_credentials", "device_flow_disabled", "unsupported_grant_type")) {
+                    signInStore.clear()
+                    pendingSignIn = null
+                    dialogMessage = "$message Start sign-in again."
+                    return@LaunchedEffect
+                }
+                repoBrowserMessage = "$message Keeping this sign-in code active; tap Check sign-in to retry."
             } else {
-                signInStore.clear()
-                pendingSignIn = null
-                dialogMessage = error?.message ?: "GitHub sign-in failed."
-                return@LaunchedEffect
+                val message = error?.message ?: "Unknown error"
+                repoBrowserMessage = if (error is IOException) {
+                    "Could not reach GitHub while checking ${pending.userCode}: $message. Keeping this sign-in code active."
+                } else {
+                    "GitHub sign-in check failed for ${pending.userCode}: $message. Keeping this sign-in code active."
+                }
             }
 
             delay(intervalSeconds * 1000L)

@@ -86,7 +86,7 @@ class GitHubOAuthClient(
     }
 
     class AuthorizationPendingException(message: String) : RuntimeException(message)
-    class OAuthException(val code: String, description: String?) : RuntimeException(
+    class OAuthException(val code: String, val description: String?) : RuntimeException(
         listOfNotNull(code, description).joinToString(": ")
     )
 

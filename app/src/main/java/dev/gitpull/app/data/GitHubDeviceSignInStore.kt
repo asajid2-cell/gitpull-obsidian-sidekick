@@ -13,7 +13,7 @@ class GitHubDeviceSignInStore(context: Context) {
             .putString(KEY_VERIFICATION_URI, pending.verificationUri)
             .putLong(KEY_EXPIRES_AT, pending.expiresAtMillis)
             .putInt(KEY_INTERVAL_SECONDS, pending.intervalSeconds)
-            .apply()
+            .commit()
     }
 
     fun load(nowMillis: Long = System.currentTimeMillis()): PendingGitHubSignIn? {
@@ -33,7 +33,7 @@ class GitHubDeviceSignInStore(context: Context) {
     }
 
     fun clear() {
-        prefs.edit().clear().apply()
+        prefs.edit().clear().commit()
     }
 
     companion object {

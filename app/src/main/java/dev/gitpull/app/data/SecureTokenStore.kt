@@ -16,7 +16,7 @@ class SecureTokenStore(context: Context) {
     )
 
     fun save(token: String) {
-        prefs.edit().putString(KEY_TOKEN, token).apply()
+        prefs.edit().putString(KEY_TOKEN, token).commit()
     }
 
     fun load(): String? {
@@ -24,7 +24,7 @@ class SecureTokenStore(context: Context) {
     }
 
     fun clear() {
-        prefs.edit().remove(KEY_TOKEN).apply()
+        prefs.edit().remove(KEY_TOKEN).commit()
     }
 
     companion object {

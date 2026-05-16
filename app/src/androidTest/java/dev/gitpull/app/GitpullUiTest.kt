@@ -35,6 +35,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import java.io.File
+import java.io.IOException
 import java.util.concurrent.atomic.AtomicInteger
 
 class GitpullUiTest {
@@ -174,6 +175,57 @@ class GitpullUiTest {
             .assertIsDisplayed()
         composeRule.onNodeWithTag("github-sign-out")
             .assertIsDisplayed()
+    }
+
+    @Test
+    fun transientGithubPollFailureKeepsPendingSignInActive() {
+        GitpullAppHooks.oauthClientFactory = { FakeTransientFailureOAuthGateway() }
+        composeRule.activityRule.scenario.recreate()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("github-sign-in")
+            .performScrollTo()
+            .performClick()
+
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            composeRule.onAllNodesWithTag("github-device-code").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        composeRule.onNodeWithTag("github-device-code")
+            .performScrollTo()
+            .assertTextContains("FAIL-1234")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Keeping this sign-in code active.", substring = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("check-github-sign-in")
+            .assertIsDisplayed()
+            .assertIsEnabled()
+    }
+
+    @Test
+    fun committedPendingGithubSignInSurvivesActivityRecreate() {
+        GitHubDeviceSignInStore(composeRule.activity).save(
+            PendingGitHubSignIn(
+                deviceCode = "device-restart",
+                userCode = "REST-1234",
+                verificationUri = "https://github.com/login/device",
+                expiresAtMillis = System.currentTimeMillis() + 900_000L,
+                intervalSeconds = 30
+            )
+        )
+        GitpullAppHooks.oauthClientFactory = { FakeAlwaysPendingOAuthGateway() }
+
+        composeRule.activityRule.scenario.recreate()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("github-device-code")
+            .performScrollTo()
+            .assertTextContains("REST-1234")
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("check-github-sign-in")
+            .assertIsDisplayed()
+            .assertIsEnabled()
     }
 
     @Test
@@ -348,6 +400,36 @@ class GitpullUiTest {
                 ),
                 nextPage = null
             )
+        }
+    }
+
+    private class FakeTransientFailureOAuthGateway : GitHubOAuthGateway {
+        override val isConfigured: Boolean = true
+
+        override fun requestDeviceCode(scope: String): GitHubDeviceCode {
+            return GitHubDeviceCode(
+                deviceCode = "device-failure",
+                userCode = "FAIL-1234",
+                verificationUri = "gitpull-device-test://authorize",
+                expiresInSeconds = 900,
+                intervalSeconds = 30
+            )
+        }
+
+        override fun pollDeviceCode(deviceCode: String): String {
+            throw IOException("network unavailable")
+        }
+    }
+
+    private class FakeAlwaysPendingOAuthGateway : GitHubOAuthGateway {
+        override val isConfigured: Boolean = true
+
+        override fun requestDeviceCode(scope: String): GitHubDeviceCode {
+            error("existing pending sign-in should be restored without requesting a new code")
+        }
+
+        override fun pollDeviceCode(deviceCode: String): String {
+            throw GitHubOAuthClient.AuthorizationPendingException("authorization_pending")
         }
     }
 }
